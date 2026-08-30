@@ -1,0 +1,70 @@
+# ============================================================
+# AutoReconX - Git Ignore
+# ============================================================
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+
+# Build / packaging
+build/
+dist/
+*.egg-info/
+
+# IDEs / editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+logs/
+
+# Runtime / temporary files
+tmp/
+temp/
+*.tmp
+
+# Reconnaissance output
+results/
+output/
+scans/
+scan-results/
+
+# Local databases
+*.db
+*.sqlite
+*.sqlite3
+
+# Generated reports
+reports/generated/
+
+# Tool caches
+.cache/
