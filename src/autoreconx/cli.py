@@ -8,6 +8,7 @@ from autoreconx.core.runner import CommandRunner
 from autoreconx.modules.subfinder import build_subfinder_args, parse_subfinder_stdout
 from autoreconx.core.scope import TargetKind
 from autoreconx.modules.dnsx import build_dnsx_args, parse_dnsx_output, write_lines
+from autoreconx.modules.naabu import build_naabu_args, filter_ips, parse_naabu_output
 
 app = typer.Typer(
     name="autoreconx",
@@ -16,11 +17,18 @@ app = typer.Typer(
 )
 
 @app.command()
-def scan(target: str = typer.Argument(..., help="Authorized target (domain/IP/CIDR within scope).")) -> None:
+def scan(target: str = typer.Argument(..., help="Authorized target (domain/IP/CIDR within scope)."),
+ports: bool = typer.Option(False, help="Enable port discovery using naabu (active scan)."),
+    allow_public: bool = typer.Option(
+        False,
+        help="Allow scanning public IPs (DANGEROUS). Enable only if explicitly authorized.",
+    ),) -> None:
+
     """
     V1: validates target/scope first. Recon execution will be added next.
     Currently implemented: Subfinder (domain scope only).
     """
+
     # 1) Scope validation (safety gate)
     try:
         scope = parse_scope(target)
@@ -112,6 +120,64 @@ def scan(target: str = typer.Argument(..., help="Authorized target (domain/IP/CI
         typer.echo(f" - {item.host} -> {', '.join(item.ips)}")
 
     typer.echo(f"[saved] dnsx raw output: {raw_dir / 'dnsx.jsonl'}")
+
+    # 8) naabu stage (port discovery) - optional
+    if not ports:
+        typer.echo("[info] port discovery disabled (use --ports to enable naabu stage).")
+        return
+
+    # Collect IPs from dnsx resolved results
+    all_ips: list[str] = []
+    for hr in resolved.resolved:
+        all_ips.extend(list(hr.ips))
+
+    # Safety: default is private IPs only unless allow_public=True
+    scan_ips = filter_ips(all_ips, allow_public=allow_public)
+
+    if not scan_ips:
+        typer.echo("[warn] no IPs eligible for scanning (private-only by default).")
+        typer.echo("[hint] use --allow-public only if you are explicitly authorized to scan those public IPs.")
+        return
+
+    typer.echo(f"[run] naabu (port discovery) targets={len(scan_ips)} allow_public={allow_public}")
+
+    ips_file = raw_dir / "ips.txt"
+    write_lines(str(ips_file), scan_ips)
+
+    naabu_args = build_naabu_args(str(ips_file), top_ports=100, rate=200)
+
+    try:
+        naabu_res = runner.run(
+            naabu_args,
+            timeout=600,
+            stdout_path=str(raw_dir / "naabu.jsonl"),
+            stderr_path=str(raw_dir / "naabu.err"),
+        )
+    except FileNotFoundError as e:
+        typer.echo(f"[warn] {e}")
+        typer.echo("[hint] install naabu and ensure it is in PATH")
+        return
+
+    if naabu_res.timed_out:
+        typer.echo("[warn] naabu timed out")
+        typer.echo(f"[saved] raw naabu stderr: {raw_dir / 'naabu.err'}")
+        return
+
+    if naabu_res.returncode != 0:
+        typer.echo(f"[warn] naabu failed (rc={naabu_res.returncode})")
+        if naabu_res.stderr.strip():
+            typer.echo(naabu_res.stderr.strip()[:500])
+        typer.echo(f"[saved] raw naabu stderr: {raw_dir / 'naabu.err'}")
+        return
+
+    open_ports = parse_naabu_output(naabu_res.stdout)
+    typer.echo(f"[ok] open ports found: {len(open_ports.open_ports)}")
+    for p in open_ports.open_ports[:10]:
+        typer.echo(f" - {p.ip}:{p.port}")
+
+    typer.echo(f"[saved] naabu raw output: {raw_dir / 'naabu.jsonl'}")
+
+
 
 @app.command()
 def version() -> None:
