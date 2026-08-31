@@ -60,19 +60,19 @@ Prioritization
    ↓
 Reporting
 
-##Documentation
+## Documentation
 
 Project documentation is maintained in the docs/ directory.
 
 Master Project Specification
 Technical Design
 
-##Legal & Ethical Use
+## Legal & Ethical Use
 
 AutoReconX is intended for authorized security testing, defensive research, CTF environments, and systems where the user has explicit permission to perform reconnaissance.
 
 Users are responsible for ensuring that their activities comply with applicable laws, regulations, and the authorization provided by the target owner.
 
-##License
+## License
 
 MIT License
