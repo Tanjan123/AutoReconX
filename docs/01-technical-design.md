@@ -1,39 +1,35 @@
-# AutoReconX — Technical Design Specification
+# AutoReconX — Technical Design
 
-**Version:** 1.0 
-**Status:** Pre-Implementation 
-**Project:** AutoReconX — Automated Reconnaissance & Attack Surface Mapping Framework 
-**Primary Language:** Python 3.12+ 
-**Target Environment:** Linux / Kali Linux 
-**Database:** SQLite 
-**License:** MIT 
-**Author:** Tanjan Singh Karki 
-**Last Updated:** 2026-08-30 
+**Version:** 1.0
+**Status:** Pre-Implementation
+**Project:** AutoReconX — Automated Reconnaissance & Attack Surface Mapping Framework
+**Primary Language:** Python 3.12+
+**Target Environment:** Kali Linux / Debian-based Linux
+**Database:** SQLite
+**License:** MIT
+**Author:** Tanjan Singh Karki
+**Last Updated:** 2026-08-31
 
+---
 
-1. Technical Design Objective
+## 1. Technical Objective
 
-The technical design defines how AutoReconX will be implemented internally.
+AutoReconX will act as an orchestration and intelligence layer around established offensive-security reconnaissance tools.
 
-The framework will act as an orchestration and intelligence layer around established reconnaissance tools rather than replacing them.
+The framework will automate the collection, processing, correlation, and reporting of reconnaissance data.
 
-The core pipeline is:
+The high-level pipeline is:
 
+```text
 Target
   ↓
 Scope Validation
   ↓
-Subdomain Discovery
+Discovery
   ↓
-DNS Resolution
+Enumeration
   ↓
-Port Discovery
-  ↓
-Service Enumeration
-  ↓
-HTTP Probing
-  ↓
-Web Crawling
+HTTP / Web Recon
   ↓
 Normalization
   ↓
@@ -41,787 +37,485 @@ Correlation
   ↓
 Prioritization
   ↓
-Database
+Storage
   ↓
-Report
+Reporting
+```
 
-The design prioritizes:
+The technical design prioritizes:
 
-modularity
-safety
-reproducibility
-structured data
-extensibility
-reliable error handling
-2. Core Technology Stack
-Component	Technology
-Programming	Python 3.12+
-CLI	Typer
-Configuration	YAML
-Database	SQLite
-ORM / DB Layer	SQLAlchemy
-Validation	Pydantic
-Logging	Python logging
-Testing	Pytest
-Packaging	pyproject.toml
-Containerization	Docker
-CI/CD	GitHub Actions
-Reports	Jinja2 + HTML
-Data formats	JSON / YAML / XML
-Version control	Git
+* Modularity
+* Safety
+* Reproducibility
+* Structured data
+* Reliable error handling
+* Extensibility
 
-For the first version, we should avoid adding unnecessary infrastructure such as Redis, PostgreSQL, Elasticsearch, Kafka, or Kubernetes.
+---
 
-The project is primarily a local offensive-security CLI framework, so lightweight architecture is preferable.
+## 2. Technology Stack
 
-3. External Reconnaissance Toolchain
+| Component        | Technology        |
+| ---------------- | ----------------- |
+| Programming      | Python 3.12+      |
+| CLI              | Typer             |
+| Configuration    | YAML              |
+| Validation       | Pydantic          |
+| Database         | SQLite            |
+| Database Layer   | SQLAlchemy        |
+| Logging          | Python `logging`  |
+| Testing          | Pytest            |
+| Packaging        | `pyproject.toml`  |
+| Reports          | Jinja2 + HTML     |
+| Data Formats     | JSON / YAML / XML |
+| Version Control  | Git               |
+| Containerization | Docker            |
+| CI               | GitHub Actions    |
 
-AutoReconX will integrate the following tools:
+The initial implementation will remain lightweight. Technologies such as PostgreSQL, Redis, Elasticsearch, Kafka, and Kubernetes are intentionally excluded from V1.
 
-Subfinder → Passive subdomain discovery
-dnsx      → DNS resolution
-Naabu     → Fast port discovery
-Nmap      → Detailed service enumeration
-httpx     → HTTP probing/fingerprinting
-Katana    → Web crawling
+---
 
-Each tool will have its own adapter.
+## 3. External Toolchain
 
-src/autoreconx/modules/
+AutoReconX will initially integrate:
 
-├── subfinder.py
-├── dnsx.py
-├── naabu.py
-├── nmap.py
-├── httpx.py
-└── katana.py
+| Tool          | Function                            |
+| ------------- | ----------------------------------- |
+| **Subfinder** | Passive subdomain discovery         |
+| **dnsx**      | DNS resolution                      |
+| **Naabu**     | Port discovery                      |
+| **Nmap**      | Service/version enumeration         |
+| **httpx**     | HTTP probing and fingerprinting     |
+| **Katana**    | Web crawling and endpoint discovery |
 
-This prevents the main application from becoming tightly coupled to individual tools.
+These tools perform the reconnaissance operations while AutoReconX manages their execution and processes their results.
 
-4. Module Architecture
+---
 
-Every reconnaissance module should follow a common interface.
+## 4. Modular Design
+
+Each reconnaissance capability will operate as an independent module.
 
 Conceptually:
 
-class ReconModule:
+```text
+Recon Module
+     ↓
+Validate
+     ↓
+Build Command
+     ↓
+Execute
+     ↓
+Parse Output
+     ↓
+Normalize Results
+```
 
-    def validate(self, context):
-        ...
+Initial modules:
 
-    def build_command(self, context):
-        ...
+```text
+modules/
+├── subfinder
+├── dnsx
+├── naabu
+├── nmap
+├── httpx
+└── katana
+```
 
-    def execute(self, context):
-        ...
+A common module interface will allow additional tools to be integrated without redesigning the core system.
 
-    def parse(self, output):
-        ...
+---
 
-    def normalize(self, data):
-        ...
+## 5. Scan Context
 
-For example:
+Every reconnaissance run will use a shared execution context containing information such as:
 
-SubfinderModule
-       ↓
-execute()
-       ↓
-raw output
-       ↓
-parse()
-       ↓
-normalize()
-       ↓
-Subdomain objects
-
-The same architecture will be used for Nmap, httpx, Katana, etc.
-
-Why?
-
-If we later add another tool, we can create another adapter without modifying the entire framework.
-
-5. Scan Context
-
-Every scan will have a shared context.
-
-Example:
-
+```text
 ScanContext
-│
 ├── scan_id
 ├── target
 ├── scope
 ├── profile
 ├── configuration
-├── logger
-├── database
 ├── workspace
+├── logger
 └── discovered_assets
+```
 
-Modules receive this context rather than independently managing configuration.
+Modules will consume this shared context rather than maintaining separate configuration and state.
 
-This gives us consistent behavior throughout the pipeline.
+This provides consistent behavior across the entire reconnaissance pipeline.
 
-6. Scope Engine
+---
 
-The scope engine is a mandatory security control.
+## 6. Scope & Safety Architecture
 
-Before any active operation:
+Scope validation will occur before reconnaissance begins.
 
-Input Target
-     ↓
+```text
+Target
+  ↓
 Scope Validator
-     ↓
+  ↓
 Allowed?
- ┌───┴───┐
-YES      NO
- │        │
-Scan    Reject
+ ┌──────┴──────┐
+YES           NO
+ ↓             ↓
+Scan          Reject
+```
 
-Example:
+The system will support:
 
-scope:
-  allowed:
-    - "*.lab.local"
+* Domains and subdomains
+* IP addresses
+* CIDR ranges
+* Explicit exclusions
 
-  excluded:
-    - "production.lab.local"
+Reconnaissance will be non-destructive by default.
 
-The engine must support:
+No module should execute against a target without passing through the scope-control layer.
 
-exact domains
-subdomains
-IP addresses
-CIDR ranges
-exclusions
+---
 
-The important principle is:
+## 7. Command Execution
 
-No reconnaissance module should directly execute against a target without passing through scope validation.
+External tools will be executed through a centralized command runner rather than directly from individual modules.
 
-7. Command Execution Layer
-
-External tools should not be launched directly from individual modules.
-
-Instead:
-
-Recon Module
-     ↓
+```text
+Module
+  ↓
 Command Runner
-     ↓
-Process
-     ↓
+  ↓
+External Tool
+  ↓
 stdout / stderr
-     ↓
+  ↓
 Parser
+```
 
-The command runner will handle:
+The runner will manage:
 
-timeout
-exit codes
-stdout
-stderr
-process termination
-logging
-execution duration
+* Argument construction
+* Timeouts
+* Exit codes
+* stdout/stderr
+* Process termination
+* Execution duration
+* Logging
 
-We should use argument lists rather than unsafe shell-string construction.
-
-For example, conceptually:
-
-["nmap", "-sV", "-oX", output_file, target]
-
-rather than dynamically constructing shell commands.
-
-This reduces command-injection risk inside the framework.
-
-8. Raw Output Management
-
-Every tool's original output should be preserved.
+Commands should use structured argument lists instead of unsafe shell-string construction.
 
 Example:
 
-results/
-└── scans/
-    └── SCAN-001/
-        ├── raw/
-        │   ├── subfinder/
-        │   ├── dnsx/
-        │   ├── naabu/
-        │   ├── nmap/
-        │   ├── httpx/
-        │   └── katana/
-        │
-        ├── normalized/
-        ├── report/
-        └── scan.json
+```text
+["nmap", "-sV", "-oX", "output.xml", "target"]
+```
 
-This is important because normalized data may contain parsing errors.
+This reduces command-injection risk within the framework.
 
-Keeping raw evidence allows us to:
+---
 
-debug parsers
-reproduce results
-verify findings
-develop improved parsers later
-9. Data Normalization
+## 8. Output & Evidence Handling
 
-Different tools produce different output formats.
+Raw tool output should be preserved before normalization.
+
+Conceptually:
+
+```text
+Raw Output
+    ↓
+Parser
+    ↓
+Normalized Data
+    ↓
+Database
+```
+
+Preserving raw output allows us to:
+
+* Debug parsing problems
+* Verify results
+* Reproduce reconnaissance
+* Improve parsers later
+
+Generated scan results will remain local and will not be committed to Git unless specifically intended as sanitized examples.
+
+---
+
+## 9. Data Architecture
+
+AutoReconX will convert different tool outputs into common security entities.
+
+Initial entities include:
+
+```text
+Scan
+Target
+Domain
+Subdomain
+Host
+IP Address
+Port
+Service
+Web Application
+URL / Endpoint
+Technology
+Observation
+Tool Execution
+```
+
+Relationships will allow the system to represent:
+
+```text
+Domain
+  ↓
+Subdomain
+  ↓
+IP
+  ↓
+Port
+  ↓
+Service
+  ↓
+Web Application
+  ↓
+Technology / Endpoint
+```
+
+Each observation should retain provenance such as the source tool, scan ID, timestamp, and confidence where applicable.
+
+---
+
+## 10. Correlation & Deduplication
+
+Different tools may discover the same asset.
 
 For example:
 
-Subfinder → domains
-dnsx      → DNS records
-Naabu     → ports
-Nmap      → services
-httpx     → HTTP metadata
-Katana    → URLs
+```text
+Subfinder → api.example.com
+dnsx      → api.example.com
+httpx     → api.example.com
+```
 
-AutoReconX converts these into common internal models.
+AutoReconX should represent these as one logical asset with multiple evidence sources.
 
-Raw Tool Output
-       ↓
-Parser
-       ↓
-Observation
-       ↓
-Canonical Asset
+The correlation layer will therefore:
 
-The framework therefore separates:
+* Normalize identifiers
+* Remove duplicates
+* Connect related assets
+* Preserve discovery sources
+* Build the overall attack-surface model
 
-Observation from Asset.
+This is a core differentiator of the project.
 
-10. Core Data Model
+---
 
-The initial database will contain the following major entities:
+## 11. Scan Profiles
 
-Scan
- │
- ├── Domain
- │     └── Subdomain
- │           └── Host
- │                 ├── IP
- │                 ├── Port
- │                 │    └── Service
- │                 └── WebApplication
- │                        ├── Technology
- │                        └── Endpoint
- │
- └── Observation
-Main entities
+The initial system will support three conceptual profiles:
 
-Scan
+### Passive
 
-id
-target
-profile
-start_time
-end_time
-status
-tool_versions
-
-Subdomain
-
-id
-hostname
-source
-first_seen
-last_seen
-
-Host
-
-id
-hostname
-ip
-ipv6
-
-Port
-
-id
-host_id
-port
-protocol
-state
-
-Service
-
-id
-port_id
-name
-product
-version
-banner
-confidence
-
-WebApplication
-
-id
-url
-scheme
-port
-status_code
-title
-server
-
-Endpoint
-
-id
-web_application_id
-url
-method
-parameter
-source
-11. Observation and Provenance Model
-
-A major design feature is evidence tracking.
-
-Instead of storing:
-
-nginx
-
-we store something closer to:
-
-Technology:
-nginx
-
-Source:
-httpx
-
-Confidence:
-High
-
-Observed:
-2026-08-30
-
-This means the framework can explain:
-
-Why do we believe this asset or technology exists?
-
-Sources may include:
-
-subfinder
-dnsx
-naabu
-nmap
-httpx
-katana
-
-This will become particularly useful for reporting and troubleshooting.
-
-12. Correlation Engine
-
-The correlation engine connects separate observations into a single attack-surface model.
-
-Example:
-
-api.lab.local
-      │
-      ▼
-10.10.10.20
-      │
- ┌────┴─────┐
- ▼          ▼
-22/tcp     443/tcp
-            │
-            ▼
-      https://api.lab.local
-            │
-       ┌────┼────┐
-       ▼    ▼    ▼
-     /api /auth /docs
-
-Instead of six independent discoveries, AutoReconX represents them as related assets.
-
-This is one of the main features that differentiates the project from simply running a sequence of tools.
-
-13. Deduplication
-
-Multiple tools can discover the same asset.
-
-Example:
-
-Subfinder → api.lab.local
-dnsx      → api.lab.local
-httpx     → api.lab.local
-
-The system should create:
-
-ONE asset
-
-with:
-
-Sources:
-- Subfinder
-- dnsx
-- httpx
-
-rather than three separate records.
-
-Deduplication keys will depend on asset type—for example, normalized hostname, IP address, or normalized URL.
-
-14. Scan Profiles
-
-Three initial profiles:
-
-Passive
+```text
 Subfinder
+↓
 DNS-related discovery
-Minimal interaction
-Standard
+```
+
+### Standard
+
+```text
 Subfinder
- ↓
+↓
 dnsx
- ↓
+↓
 Naabu
- ↓
+↓
 Nmap
- ↓
+↓
 httpx
-Full
+```
+
+### Full
+
+```text
 Subfinder
- ↓
+↓
 dnsx
- ↓
+↓
 Naabu
- ↓
+↓
 Nmap
- ↓
+↓
 httpx
- ↓
+↓
 Katana
- ↓
+↓
 Correlation
- ↓
+↓
 Prioritization
+```
 
-Profiles allow the tester to choose reconnaissance depth according to the authorized assessment.
+Profiles allow reconnaissance depth to be selected according to the authorized assessment.
 
-15. Prioritization Engine
+---
 
-AutoReconX will not claim that an asset is vulnerable.
+## 12. Storage
 
-Instead, it will calculate investigation priority.
+SQLite will be used for V1.
 
-Potential signals:
+The database will store:
 
-admin hostname
-api hostname
-dev/staging hostname
-authentication endpoint
-unusual exposed service
-newly discovered asset
-multiple exposed ports
-interesting web path
+* Scan information
+* Targets
+* Discovered assets
+* Relationships
+* Observations
+* Tool executions
+* Execution status
+
+SQLite is appropriate because AutoReconX is initially designed as a local, single-user CLI framework.
+
+The storage layer should be abstracted enough to allow a future PostgreSQL implementation without redesigning the application.
+
+---
+
+## 13. Prioritization
+
+AutoReconX will identify **investigation priority**, not claim that an asset is vulnerable.
+
+Potential signals include:
+
+* Administrative hostnames
+* API-related hosts
+* Development/staging indicators
+* Authentication endpoints
+* Unusual exposed services
+* Multiple exposed ports
+* Interesting web paths
+* Newly discovered assets
 
 Example:
 
-admin.lab.local
+```text
+admin.example.com
 
 Priority: HIGH
 
 Reasons:
-- Administrative naming
+- Administrative hostname
 - Web application detected
 - Authentication endpoint
-- Newly discovered
+```
 
-This is a prioritization mechanism—not a vulnerability severity rating.
+The initial scoring system will be transparent and rule-based so that users can understand why an asset was prioritized.
 
-16. Reporting Architecture
+---
 
-Reports will be generated from the normalized database rather than directly from individual tools.
+## 14. Reporting
 
-Database
-   ↓
+Reports will be generated from normalized stored data rather than directly from individual tools.
+
+```text
+SQLite
+  ↓
 Report Engine
-   ├── JSON
-   ├── Markdown
-   └── HTML
+  ├── JSON
+  ├── Markdown
+  └── HTML
+```
 
-This ensures all report formats contain the same underlying information.
+Reports should contain:
 
-Report sections
-Executive Summary
-Scope
-Scan Configuration
-Toolchain
-Discovery Statistics
-Subdomains
-Hosts
-Ports
-Services
-Web Applications
-Technologies
-Endpoints
-Interesting Assets
-Priority Ranking
-Errors / Limitations
-17. CLI Design
+* Target and scope
+* Scan information
+* Discovery statistics
+* Domains/subdomains
+* Hosts/IPs
+* Ports/services
+* Web applications
+* Technologies
+* Endpoints
+* Priority indicators
+* Tool provenance
+* Errors and limitations
 
-Initial CLI structure:
+---
 
-autoreconx version
+## 15. Configuration & Logging
 
-autoreconx validate --target example.com
+Configuration will be separated from application code.
 
-autoreconx scan \
-    --target example.com \
-    --profile standard
+Initial configuration will control:
 
-autoreconx report \
-    --scan SCAN-001 \
-    --format html
+* Scan profile
+* Tool paths
+* Timeouts
+* Concurrency
+* Output location
+* Database location
+* Logging level
 
-autoreconx status \
-    --scan SCAN-001
+Sensitive values such as API keys must be supplied through environment variables or protected configuration and must never be committed to Git.
 
-The CLI should remain simple enough that a penetration tester can understand it immediately.
+Logging will record important execution events and failures without exposing secrets.
 
-18. Configuration Design
+---
 
-Configuration will use YAML.
-
-Example:
-
-project:
-  name: AutoReconX
-
-scan:
-  profile: standard
-  timeout: 30
-  concurrency: 10
-
-scope:
-  allowed: []
-  excluded: []
-
-output:
-  directory: ./results
-  formats:
-    - json
-    - markdown
-    - html
-
-CLI arguments should be able to override non-sensitive configuration values.
-
-19. Error Handling
-
-Modules should fail gracefully.
-
-Example:
-
-Subfinder   ✓
-dnsx        ✓
-Naabu       ✓
-Nmap        ✓
-httpx       ✓
-Katana      ⚠ failed
-
-The scan should report:
-
-Status: COMPLETED_WITH_WARNINGS
-
-rather than silently pretending everything succeeded.
-
-Every failure should contain:
-
-module
-error
-timestamp
-exit code
-
-when available.
-
-20. Testing Strategy
+## 16. Testing & Reliability
 
 Testing will use Pytest.
 
-Unit tests
-Scope validation
-Configuration
-Parsers
-Normalization
-Deduplication
-Priority calculation
-Integration tests
-Tool adapter
+### Unit Testing
+
+Core components such as:
+
+* Scope validation
+* Configuration
+* Parsers
+* Normalization
+* Deduplication
+* Prioritization
+* Storage
+
+### Integration Testing
+
+```text
+Tool Adapter
      ↓
 Parser
      ↓
 Normalizer
      ↓
 Database
-End-to-end
+```
 
-Use our controlled Docker lab:
+### End-to-End Testing
 
-AutoReconX
-     ↓
-Lab Environment
-     ↓
-Complete Scan
-     ↓
-Expected Assets
-     ↓
-Compare Results
+A controlled Docker laboratory will provide known hosts, ports, services, web applications, and endpoints so complete reconnaissance runs can be verified.
 
-The E2E tests will not depend on public websites.
+Tool failures should be isolated where possible. A partial failure should produce a clear warning rather than silently reporting an incomplete successful scan.
 
-21. Docker Lab
+---
 
-We will create a deliberately controlled environment:
+## 17. Implementation Principles
 
-                Kali / Host
-                    │
-                AutoReconX
-                    │
-             Docker Network
-                    │
-        ┌───────────┼───────────┐
-        ▼           ▼           ▼
-      web01       api01       linux01
+The implementation will follow these principles:
 
-The lab will contain known:
+1. Keep the core engine independent from external tools.
+2. Use adapters for individual reconnaissance tools.
+3. Keep raw evidence separate from normalized data.
+4. Preserve provenance for important observations.
+5. Validate scope before execution.
+6. Prefer safe structured process execution.
+7. Keep V1 lightweight and locally deployable.
+8. Test each component before integrating the next.
+9. Avoid unnecessary infrastructure.
+10. Design extension points without prematurely implementing them.
 
-DNS names
-ports
-services
-web applications
-endpoints
-technologies
-
-This allows us to verify whether AutoReconX actually discovers what it is supposed to discover.
-
-22. Initial Repository Structure
-autoreconx/
-│
-├── README.md
-├── LICENSE
-├── SECURITY.md
-├── CONTRIBUTING.md
-├── pyproject.toml
-├── Dockerfile
-│
-├── docs/
-│   ├── master-specification.md
-│   ├── technical-design.md
-│   ├── architecture.md
-│   └── methodology.md
-│
-├── src/
-│   └── autoreconx/
-│       ├── cli/
-│       ├── core/
-│       ├── modules/
-│       ├── models/
-│       ├── parsers/
-│       ├── correlation/
-│       ├── reporting/
-│       ├── storage/
-│       └── utils/
-│
-├── tests/
-│   ├── unit/
-│   ├── integration/
-│   └── e2e/
-│
-├── lab/
-├── examples/
-└── .github/
-    └── workflows/
-23. Development Order
-
-We will implement it in this exact order:
-
-1. Project skeleton
-       ↓
-2. Configuration
-       ↓
-3. Logging
-       ↓
-4. CLI
-       ↓
-5. Scope engine
-       ↓
-6. Command runner
-       ↓
-7. Subfinder adapter
-       ↓
-8. dnsx adapter
-       ↓
-9. Data models
-       ↓
-10. Normalization
-       ↓
-11. SQLite storage
-       ↓
-12. Naabu
-       ↓
-13. Nmap
-       ↓
-14. httpx
-       ↓
-15. Katana
-       ↓
-16. Correlation
-       ↓
-17. Prioritization
-       ↓
-18. Reporting
-       ↓
-19. Testing
-       ↓
-20. Docker + CI
-
-This prevents us from building advanced functionality on an unstable foundation.
-
-24. Definition of Done for v1.0
-
-AutoReconX will be considered ready for its first serious GitHub release when:
-
- Scope enforcement works
- CLI is functional
- All six core tools have adapters
- Tool failures are handled correctly
- Raw outputs are preserved
- Results are normalized
- Duplicate assets are merged
- Provenance is recorded
- Assets are correlated
- Priority ranking works
- SQLite persistence works
- JSON/Markdown/HTML reports work
- Unit tests exist
- Integration tests exist
- Controlled E2E lab works
- Docker deployment works
- GitHub Actions CI works
- Security documentation exists
- Technical documentation is complete
-Final Design Principle
-
-The most important architectural decision is this:
-
-                External Tools
-                     │
-       ┌─────────────┼─────────────┐
-       ▼             ▼             ▼
-   Discovery    Enumeration     Crawling
-       │             │             │
-       └─────────────┼─────────────┘
-                     ▼
-              AutoReconX Core
-                     │
-       ┌─────────────┼─────────────┐
-       ▼             ▼             ▼
-   Normalize      Correlate     Prioritize
-       │             │             │
-       └─────────────┼─────────────┘
-                     ▼
-              Security Intelligence
-                     │
-                     ▼
-                  Reports
-
-AutoReconX is not valuable because it can execute six existing tools. It becomes valuable when it can reliably transform the outputs of those tools into one coherent, evidence-backed attack-surface model.
+**Current Status:** Technical design finalized — implementation not yet started.
