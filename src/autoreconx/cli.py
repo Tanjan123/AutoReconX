@@ -9,6 +9,7 @@ from autoreconx.modules.subfinder import build_subfinder_args, parse_subfinder_s
 from autoreconx.core.scope import TargetKind
 from autoreconx.modules.dnsx import build_dnsx_args, parse_dnsx_output, write_lines
 from autoreconx.modules.naabu import build_naabu_args, filter_ips, parse_naabu_output
+from autoreconx.modules.nmap import build_nmap_args, parse_nmap_xml
 
 app = typer.Typer(
     name="autoreconx",
@@ -17,16 +18,19 @@ app = typer.Typer(
 )
 
 @app.command()
-def scan(target: str = typer.Argument(..., help="Authorized target (domain/IP/CIDR within scope)."),
-ports: bool = typer.Option(False, help="Enable port discovery using naabu (active scan)."),
+def scan(
+    target: str = typer.Argument(..., help="Authorized target (domain/IP/CIDR within scope)."),
+    ports: bool = typer.Option(False, help="Enable port discovery using naabu (active scan)."),
     allow_public: bool = typer.Option(
         False,
         help="Allow scanning public IPs (DANGEROUS). Enable only if explicitly authorized.",
-    ),) -> None:
+    ),
+    services: bool = typer.Option(False, help="Enable Nmap service enumeration on discovered open ports."),
+) -> None:
 
     """
-    V1: validates target/scope first. Recon execution will be added next.
-    Currently implemented: Subfinder (domain scope only).
+    Pipeline (current):
+    scope -> subfinder -> dnsx -> (optional naabu) -> (optional nmap)
     """
 
     # 1) Scope validation (safety gate)
@@ -37,19 +41,100 @@ ports: bool = typer.Option(False, help="Enable port discovery using naabu (activ
 
     typer.echo(f"[scope OK] kind={scope.kind} target={scope.target}")
 
-    # 2) V1: run subfinder only for domain targets
-    if scope.kind != TargetKind.DOMAIN:
-        typer.echo("[info] Subfinder runs only for domain targets in V1.")
-        return
-
-    # 3) Create a simple workspace for this scan (raw evidence)
+    # Create workspace for ALL scan types (domain/ip/cidr)
     scan_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
     workspace = Path("workspaces") / scan_id
     raw_dir = workspace / "raw"
     raw_dir.mkdir(parents=True, exist_ok=True)
 
-    # 4) Run subfinder via the centralized runner
+    # Central runner for ALL stages
     runner = CommandRunner(default_timeout=120)
+
+    # --- IP MODE (local/lab target) ---
+    if scope.kind == TargetKind.IP:
+
+        # For global public IPs, require explicit permission flag
+        # (local/private/loopback are allowed by default)
+        scan_ips = filter_ips([scope.target], allow_public=allow_public)
+        if not scan_ips:
+            typer.echo("[warn] target IP is public/global and scanning is disabled by default.")
+            typer.echo("[hint] use --allow-public only if you are explicitly authorized.")
+            return
+
+        if not ports:
+            typer.echo("[info] IP target detected. Use --ports to run naabu, and --services for nmap.")
+            return
+
+        typer.echo(f"[run] naabu (port discovery) targets=1 allow_public={allow_public}")
+
+        ips_file = raw_dir / "ips.txt"
+        write_lines(str(ips_file), scan_ips)
+
+        naabu_args = build_naabu_args(str(ips_file), top_ports=1000, rate=200)
+        naabu_res = runner.run(
+            naabu_args,
+            timeout=600,
+            stdout_path=str(raw_dir / "naabu.jsonl"),
+            stderr_path=str(raw_dir / "naabu.err"),
+        )
+
+        if naabu_res.timed_out:
+            typer.echo("[warn] naabu timed out")
+            return
+        if naabu_res.returncode != 0:
+            typer.echo(f"[warn] naabu failed (rc={naabu_res.returncode})")
+            if naabu_res.stderr.strip():
+                typer.echo(naabu_res.stderr.strip()[:500])
+            return
+
+        open_ports = parse_naabu_output(naabu_res.stdout)
+        typer.echo(f"[ok] open ports found: {len(open_ports.open_ports)}")
+        for p in open_ports.open_ports[:10]:
+            typer.echo(f" - {p.ip}:{p.port}")
+
+        if not services:
+            typer.echo("[info] service enumeration disabled (use --services to enable nmap stage).")
+            return
+
+        ports_by_ip: dict[str, list[int]] = {}
+        for op in open_ports.open_ports:
+            ports_by_ip.setdefault(op.ip, []).append(op.port)
+
+        typer.echo(f"[run] nmap (service enumeration) hosts={len(ports_by_ip)}")
+        for ip, port_list in ports_by_ip.items():
+            typer.echo(f"[run] nmap {ip} ports={sorted(set(port_list))}")
+
+            xml_path = raw_dir / f"nmap-{ip}.xml"
+            nmap_args = build_nmap_args(ip, port_list, xml_out=str(xml_path))
+            nmap_res = runner.run(
+                nmap_args,
+                timeout=900,
+                stdout_path=str(raw_dir / f"nmap-{ip}.stdout"),
+                stderr_path=str(raw_dir / f"nmap-{ip}.err"),
+            )
+
+            if nmap_res.timed_out:
+                typer.echo(f"[warn] nmap timed out for {ip}")
+                continue
+            if nmap_res.returncode != 0:
+                typer.echo(f"[warn] nmap failed for {ip} (rc={nmap_res.returncode})")
+                continue
+
+            xml_text = xml_path.read_text(encoding="utf-8", errors="replace")
+            nmap_parsed = parse_nmap_xml(xml_text)
+
+            typer.echo(f"[ok] {ip} services(open-only): {len(nmap_parsed.services)}")
+            for s in nmap_parsed.services[:10]:
+                name = s.service or "unknown"
+                typer.echo(f" - {s.ip}:{s.port}/{s.protocol} {name}")
+
+        return
+
+    # 2) V1: run subfinder only for domain targets
+    if scope.kind != TargetKind.DOMAIN:
+        typer.echo("[info] Subfinder runs only for domain targets in V1.")
+        return
+
     args = build_subfinder_args(scope.target)
 
     typer.echo("[run] subfinder (passive subdomain discovery)")
@@ -144,7 +229,7 @@ ports: bool = typer.Option(False, help="Enable port discovery using naabu (activ
     ips_file = raw_dir / "ips.txt"
     write_lines(str(ips_file), scan_ips)
 
-    naabu_args = build_naabu_args(str(ips_file), top_ports=100, rate=200)
+    naabu_args = build_naabu_args(str(ips_file), top_ports=1000, rate=200)
 
     try:
         naabu_res = runner.run(
@@ -177,6 +262,47 @@ ports: bool = typer.Option(False, help="Enable port discovery using naabu (activ
 
     typer.echo(f"[saved] naabu raw output: {raw_dir / 'naabu.jsonl'}")
 
+    # 9) nmap stage (service enumeration)
+    if not services:
+        typer.echo("[info] service enumeration disabled (use --services to enable nmap stage).")
+        return
+
+    # group ports by IP
+    ports_by_ip: dict[str, list[int]] = {}
+    for op in open_ports.open_ports:
+        ports_by_ip.setdefault(op.ip, []).append(op.port)
+
+    typer.echo(f"[run] nmap (service enumeration) hosts={len(ports_by_ip)}")
+
+    for ip, port_list in ports_by_ip.items():
+        typer.echo(f"[run] nmap {ip} ports={sorted(set(port_list))}")
+
+        xml_path = raw_dir / f"nmap-{ip}.xml"
+        nmap_args = build_nmap_args(ip, port_list, xml_out=str(xml_path))
+
+        nmap_res = runner.run(
+            nmap_args,
+            timeout=900,
+            stdout_path=str(raw_dir / f"nmap-{ip}.stdout"),
+            stderr_path=str(raw_dir / f"nmap-{ip}.err"),
+        )
+
+        if nmap_res.timed_out:
+            typer.echo(f"[warn] nmap timed out for {ip}")
+            continue
+
+        if nmap_res.returncode != 0:
+            typer.echo(f"[warn] nmap failed for {ip} (rc={nmap_res.returncode})")
+            continue
+
+        # parse XML from file
+        xml_text = xml_path.read_text(encoding="utf-8", errors="replace")
+        nmap_parsed = parse_nmap_xml(xml_text)
+
+        typer.echo(f"[ok] {ip} services: {len(nmap_parsed.services)}")
+        for s in nmap_parsed.services[:10]:
+            name = s.service or "unknown"
+            typer.echo(f" - {s.ip}:{s.port}/{s.protocol} {name}")
 
 
 @app.command()
@@ -189,3 +315,4 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
+

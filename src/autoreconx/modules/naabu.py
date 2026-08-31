@@ -31,7 +31,7 @@ def filter_ips(ips: Iterable[str], *, allow_public: bool) -> list[str]:
         if allow_public:
             out.append(str(ip_obj))
         else:
-            if ip_obj.is_private:
+            if not ip_obj.is_global:
                 out.append(str(ip_obj))
     return sorted(set(out))
 
