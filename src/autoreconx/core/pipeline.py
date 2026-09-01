@@ -6,8 +6,6 @@ import typer
 
 from autoreconx.core.context import ScanContext
 from autoreconx.modules.dnsx import (
-    build_dnsx_args,
-    parse_dnsx_output,
     write_lines,
 )
 from autoreconx.modules.httpx_toolkit import (
@@ -24,9 +22,9 @@ from autoreconx.modules.nmap import (
     build_nmap_args,
     parse_nmap_xml,
 )
-from autoreconx.modules.subfinder import (
-    build_subfinder_args,
-    parse_subfinder_stdout,
+from autoreconx.stages.discovery import (
+    run_dns_resolution,
+    run_subfinder,
 )
 
 
@@ -65,7 +63,6 @@ def run_ip_pipeline(
          ↓
         Nmap (optional)
     """
-
     scope = context.scope
     raw_dir = context.raw_dir
     runner = context.runner
@@ -385,111 +382,27 @@ def run_domain_pipeline(
         Nmap service enumeration (optional)
     """
 
-    scope = context.scope
     raw_dir = context.raw_dir
     runner = context.runner
 
-    # Subfinder
-    typer.echo("[run] subfinder (passive subdomain discovery)")
+    # Subfinder (passive subdomain discovery)
+    subdomains = run_subfinder(context)
 
-    args = build_subfinder_args(scope.target)
-
-    try:
-        result = runner.run(
-            args,
-            stdout_path=str(raw_dir / "subfinder.txt"),
-            stderr_path=str(raw_dir / "subfinder.err"),
-        )
-    except FileNotFoundError as exc:
-        typer.echo(f"[warn] {exc}")
-        typer.echo("[hint] install subfinder and ensure it is in PATH")
+    if not subdomains:
+        typer.echo("[info] no subdomains discovered; stopping.")
         return
 
-    if result.timed_out:
-        typer.echo("[warn] subfinder timed out")
-        return
+    # DNS resolution
+    resolved = run_dns_resolution(
+        context,
+        subdomains,
+    )
 
-    if result.returncode != 0:
+    if resolved is None:
         typer.echo(
-            f"[warn] subfinder failed (rc={result.returncode})"
-        )
-        if result.stderr.strip():
-            typer.echo(result.stderr.strip()[:500])
-        return
-
-    parsed = parse_subfinder_stdout(
-        result.stdout,
-        root_domain=scope.target,
-    )
-
-    typer.echo(
-        f"[ok] subdomains discovered: {len(parsed.subdomains)}"
-    )
-
-    for subdomain in parsed.subdomains[:10]:
-        typer.echo(f" - {subdomain}")
-
-    typer.echo(
-        f"[saved] raw output: {raw_dir / 'subfinder.txt'}"
-    )
-
-    # dnsx
-    typer.echo("[run] dnsx (DNS resolution)")
-
-    subdomains_file = raw_dir / "subdomains.txt"
-    write_lines(
-        str(subdomains_file),
-        parsed.subdomains,
-    )
-
-    dnsx_args = build_dnsx_args(
-        str(subdomains_file)
-    )
-
-    try:
-        dnsx_res = runner.run(
-            dnsx_args,
-            timeout=600,
-            stdout_path=str(raw_dir / "dnsx.jsonl"),
-            stderr_path=str(raw_dir / "dnsx.err"),
-        )
-    except FileNotFoundError as exc:
-        typer.echo(f"[warn] {exc}")
-        typer.echo(
-            "[hint] install dnsx and ensure it is in PATH"
+            "[info] DNS resolution did not complete; stopping."
         )
         return
-
-    if dnsx_res.timed_out:
-        typer.echo("[warn] dnsx timed out")
-        return
-
-    if dnsx_res.returncode != 0:
-        typer.echo(
-            f"[warn] dnsx failed (rc={dnsx_res.returncode})"
-        )
-        if dnsx_res.stderr.strip():
-            typer.echo(dnsx_res.stderr.strip()[:500])
-        return
-
-    resolved = parse_dnsx_output(
-        dnsx_res.stdout,
-        root_domain=scope.target,
-    )
-
-    typer.echo(
-        f"[ok] resolved hosts: {len(resolved.resolved)}"
-    )
-
-    for item in resolved.resolved[:10]:
-        typer.echo(
-            f" - {item.host} -> {', '.join(item.ips)}"
-        )
-
-    typer.echo(
-        f"[saved] dnsx raw output: "
-        f"{raw_dir / 'dnsx.jsonl'}"
-    )
 
     # HTTPX hostname probing
     host_seed_urls: list[str] = []
