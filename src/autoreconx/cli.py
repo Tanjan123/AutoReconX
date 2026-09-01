@@ -22,6 +22,10 @@ def scan(
     ),
     services: bool = typer.Option(False, help="Enable Nmap service enumeration on discovered open ports."),
     web: bool = typer.Option(False, help="Enable HTTP probing using ProjectDiscovery httpx-toolkit."),
+    crawl: bool = typer.Option(
+        False,
+        help="Enable Katana endpoint crawling on discovered web applications.",
+    ),
 ) -> None:
 
     """
@@ -47,6 +51,7 @@ def scan(
             ports=ports,
             services=services,
             web=web,
+            crawl=crawl,
             allow_public=allow_public,
         )
         return
@@ -58,6 +63,7 @@ def scan(
             ports=ports,
             services=services,
             web=web,
+            crawl=crawl,
             allow_public=allow_public,
         )
         return

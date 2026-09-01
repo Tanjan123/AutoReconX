@@ -11,6 +11,7 @@ from autoreconx.modules.httpx_toolkit import (
 from autoreconx.modules.naabu import (
     filter_ips,
 )
+from autoreconx.stages.crawl import run_crawl
 from autoreconx.stages.discovery import (
     run_dns_resolution,
     run_subfinder,
@@ -45,6 +46,7 @@ def run_ip_pipeline(
     ports: bool,
     services: bool,
     web: bool,
+    crawl: bool,
     allow_public: bool,
 ) -> None:
     """
@@ -98,19 +100,38 @@ def run_ip_pipeline(
     # HTTPX
     open_ports = port_result.open_ports
 
-    if web:
-        urls = build_ip_web_urls(
+    web_urls: tuple[str, ...] = ()
+
+    if web or crawl:
+        web_urls = build_ip_web_urls(
             scope.target,
             open_ports,
             requested_path=requested_path,
         )
 
-        run_http_probe(
+        http_result = run_http_probe(
             context,
-            urls,
+            web_urls,
             evidence_name="httpx",
             label="HTTP probing",
         )
+
+        if crawl and http_result is not None:
+            confirmed_urls = tuple(
+                sorted(
+                    {
+                        item.url
+                        for item in http_result.items
+                    }
+                )
+            )
+
+            run_crawl(
+                context,
+                confirmed_urls,
+                depth=2,
+                evidence_name="katana",
+            )
 
     # Nmap
     if services:
@@ -130,6 +151,7 @@ def run_domain_pipeline(
     ports: bool,
     services: bool,
     web: bool,
+    crawl: bool,
     allow_public: bool,
 ) -> None:
     """
@@ -173,18 +195,36 @@ def run_domain_pipeline(
 
     # HTTPX hostname probing
     host_seed_urls: tuple[str, ...] = ()
+    host_http_result = None
 
-    if web:
+    if web or crawl:
         host_seed_urls = build_hostname_seed_urls(
             resolved.resolved
         )
 
-        run_http_probe(
+        host_http_result = run_http_probe(
             context,
             host_seed_urls,
             evidence_name="httpx-hosts",
             label="HTTP probing - hostnames",
         )
+
+        if crawl and host_http_result is not None:
+            confirmed_urls = tuple(
+                sorted(
+                    {
+                        item.url
+                        for item in host_http_result.items
+                    }
+                )
+            )
+
+            run_crawl(
+                context,
+                confirmed_urls,
+                depth=2,
+                evidence_name="katana-hosts",
+            )
 
     # Port discovery is optional
     if not ports:
