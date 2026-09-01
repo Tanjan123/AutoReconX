@@ -87,3 +87,48 @@ def parse_httpx_output(output: str) -> HttpxResult:
         )
 
     return HttpxResult(items=tuple(items))
+
+def build_web_urls(
+    resolved_hosts,
+    open_ports,
+) -> tuple[str, ...]:
+    """
+    Correlate DNS host->IP mappings with discovered IP->port mappings
+    and produce hostname-based web URLs.
+
+    Example:
+        api.example.com -> 1.2.3.4
+        1.2.3.4 -> 443
+
+    becomes:
+        https://api.example.com
+    """
+
+    web_ports = {80, 443, 3000, 5000, 8000, 8080, 8443}
+
+    ports_by_ip: dict[str, set[int]] = {}
+
+    for item in open_ports:
+        if item.port in web_ports:
+            ports_by_ip.setdefault(item.ip, set()).add(item.port)
+
+    urls: set[str] = set()
+
+    for host_resolution in resolved_hosts:
+        host = host_resolution.host
+
+        for ip in host_resolution.ips:
+            for port in ports_by_ip.get(ip, set()):
+                scheme = "https" if port in {443, 8443} else "http"
+
+                if (
+                    (scheme == "http" and port == 80)
+                    or (scheme == "https" and port == 443)
+                ):
+                    url = f"{scheme}://{host}"
+                else:
+                    url = f"{scheme}://{host}:{port}"
+
+                urls.add(url)
+
+    return tuple(sorted(urls))

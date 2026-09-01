@@ -1,5 +1,7 @@
 from autoreconx.modules.httpx_toolkit import parse_httpx_output
-
+from autoreconx.modules.dnsx import HostResolution
+from autoreconx.modules.naabu import OpenPort
+from autoreconx.modules.httpx_toolkit import build_web_urls
 
 def test_parse_httpx_json_lines():
     sample = """
@@ -9,3 +11,29 @@ def test_parse_httpx_json_lines():
     assert len(res.items) == 1
     assert res.items[0].status_code == 200
     assert "DVWA" in (res.items[0].title or "")
+
+def test_build_web_urls_correlates_hostname_and_port():
+    resolved = (
+        HostResolution(
+            host="api.example.com",
+            ips=("1.2.3.4",),
+        ),
+        HostResolution(
+            host="admin.example.com",
+            ips=("5.6.7.8",),
+        ),
+    )
+
+    ports = (
+        OpenPort(ip="1.2.3.4", port=443),
+        OpenPort(ip="5.6.7.8", port=80),
+        OpenPort(ip="5.6.7.8", port=22),
+    )
+
+    urls = build_web_urls(resolved, ports)
+
+    assert "https://api.example.com" in urls
+    assert "http://admin.example.com" in urls
+
+    # SSH must not become a web URL.
+    assert all(":22" not in url for url in urls)

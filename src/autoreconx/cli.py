@@ -11,7 +11,7 @@ from autoreconx.modules.dnsx import build_dnsx_args, parse_dnsx_output, write_li
 from autoreconx.modules.naabu import build_naabu_args, filter_ips, parse_naabu_output
 from autoreconx.modules.nmap import build_nmap_args, parse_nmap_xml
 from urllib.parse import urlparse
-from autoreconx.modules.httpx_toolkit import build_httpx_toolkit_args, parse_httpx_output
+from autoreconx.modules.httpx_toolkit import build_httpx_toolkit_args, parse_httpx_output, build_web_urls
 
 app = typer.Typer(
     name="autoreconx",
@@ -309,7 +309,87 @@ def scan(
 
     typer.echo(f"[saved] dnsx raw output: {raw_dir / 'dnsx.jsonl'}")
 
-    # 8) naabu stage (port discovery) - optional
+    # 8) HTTPX hostname probing (domain mode)
+    host_seed_urls: list[str] = []
+
+    if web:
+        seed_urls: set[str] = set()
+
+        for host_resolution in resolved.resolved:
+            seed_urls.add(f"http://{host_resolution.host}")
+            seed_urls.add(f"https://{host_resolution.host}")
+
+        host_seed_urls = sorted(seed_urls)
+
+        if not host_seed_urls:
+            typer.echo("[info] no resolved hostnames available for HTTP probing.")
+        else:
+            urls_file = raw_dir / "urls-hosts.txt"
+            write_lines(str(urls_file), host_seed_urls)
+
+            typer.echo(
+                f"[run] httpx-toolkit (HTTP probing - hostnames) "
+                f"urls={len(host_seed_urls)}"
+            )
+
+            httpx_args = build_httpx_toolkit_args(str(urls_file))
+
+            try:
+                httpx_res = runner.run(
+                    httpx_args,
+                    timeout=300,
+                    stdout_path=str(raw_dir / "httpx-hosts.jsonl"),
+                    stderr_path=str(raw_dir / "httpx-hosts.err"),
+                )
+            except FileNotFoundError as e:
+                typer.echo(f"[warn] {e}")
+                typer.echo(
+                    "[hint] install ProjectDiscovery httpx-toolkit "
+                    "and ensure it is in PATH"
+                )
+            else:
+                if httpx_res.timed_out:
+                    typer.echo("[warn] httpx-toolkit timed out (hostnames)")
+
+                elif httpx_res.returncode != 0:
+                    typer.echo(
+                        f"[warn] httpx-toolkit failed (hostnames) "
+                        f"rc={httpx_res.returncode}"
+                    )
+
+                    if httpx_res.stderr.strip():
+                        typer.echo(httpx_res.stderr.strip()[:500])
+
+                else:
+                    parsed_http = parse_httpx_output(httpx_res.stdout)
+
+                    typer.echo(
+                        f"[ok] httpx results (hostnames): "
+                        f"{len(parsed_http.items)}"
+                    )
+
+                    for item in parsed_http.items[:10]:
+                        title = item.title or ""
+                        server = item.webserver or ""
+
+                        typer.echo(
+                            f" - {item.url} "
+                            f"[{item.status_code}] "
+                            f"{title} {server}".rstrip()
+                        )
+
+                        if item.tech:
+                            typer.echo(
+                                f"   tech: {', '.join(item.tech)}"
+                            )
+
+                    typer.echo(
+                        f"[saved] httpx raw output: "
+                        f"{raw_dir / 'httpx-hosts.jsonl'}"
+                    )
+
+
+    # 9) naabu stage (port discovery) - optional
     if not ports:
         typer.echo("[info] port discovery disabled (use --ports to enable naabu stage).")
         return
@@ -365,59 +445,90 @@ def scan(
 
     typer.echo(f"[saved] naabu raw output: {raw_dir / 'naabu.jsonl'}")
 
-    # 9) HTTPX Toolkit stage (optional web probing)
+    # 10) HTTPX probing for additional web ports discovered by Naabu
     if web:
-        web_ports = {80, 443, 8080, 8000, 8443, 3000, 5000}
-        urls: list[str] = []
+        discovered_port_urls = set(
+            build_web_urls(
+                resolved.resolved,
+                open_ports.open_ports,
+            )
+        )
 
-        for p in open_ports.open_ports:
-            if p.port not in web_ports:
-                continue
+        extra_urls = sorted(
+            discovered_port_urls - set(host_seed_urls)
+        )
 
-            scheme = "https" if p.port in {443, 8443} else "http"
-            base = f"{scheme}://{p.ip}:{p.port}"
-            urls.append(base + requested_path)
-
-        if not urls:
-            typer.echo("[info] no web ports found to probe with httpx-toolkit.")
+        if not extra_urls:
+            typer.echo(
+                "[info] no additional web port URLs discovered."
+            )
         else:
-            urls_file = raw_dir / "urls.txt"
-            write_lines(str(urls_file), urls)
+            urls_file = raw_dir / "urls-ports.txt"
+            write_lines(str(urls_file), extra_urls)
 
-            typer.echo(f"[run] httpx-toolkit (HTTP probing) urls={len(urls)}")
-
-            httpx_args = build_httpx_toolkit_args(str(urls_file))
-            httpx_res = runner.run(
-                httpx_args,
-                timeout=300,
-                stdout_path=str(raw_dir / "httpx.jsonl"),
-                stderr_path=str(raw_dir / "httpx.err"),
+            typer.echo(
+                f"[run] httpx-toolkit "
+                f"(HTTP probing - discovered ports) "
+                f"urls={len(extra_urls)}"
             )
 
-            if httpx_res.timed_out:
-                typer.echo("[warn] httpx-toolkit timed out")
-            elif httpx_res.returncode != 0:
-                typer.echo(
-                    f"[warn] httpx-toolkit failed (rc={httpx_res.returncode})"
+            httpx_args = build_httpx_toolkit_args(str(urls_file))
+
+            try:
+                httpx_res = runner.run(
+                    httpx_args,
+                    timeout=300,
+                    stdout_path=str(raw_dir / "httpx-ports.jsonl"),
+                    stderr_path=str(raw_dir / "httpx-ports.err"),
                 )
-                if httpx_res.stderr.strip():
-                    typer.echo(httpx_res.stderr.strip()[:500])
+            except FileNotFoundError as e:
+                typer.echo(f"[warn] {e}")
             else:
-                parsed_http = parse_httpx_output(httpx_res.stdout)
-
-                typer.echo(f"[ok] httpx results: {len(parsed_http.items)}")
-
-                for item in parsed_http.items[:5]:
-                    title = f" {item.title}" if item.title else ""
+                if httpx_res.timed_out:
                     typer.echo(
-                        f" - {item.url} [{item.status_code}]{title}"
+                        "[warn] httpx-toolkit timed out "
+                        "(discovered ports)"
                     )
 
-                typer.echo(
-                    f"[saved] httpx raw output: {raw_dir / 'httpx.jsonl'}"
-                )
-                   
-    # 10) nmap stage (service enumeration)
+                elif httpx_res.returncode != 0:
+                    typer.echo(
+                        f"[warn] httpx-toolkit failed "
+                        f"(discovered ports) "
+                        f"rc={httpx_res.returncode}"
+                    )
+
+                    if httpx_res.stderr.strip():
+                        typer.echo(
+                            httpx_res.stderr.strip()[:500]
+                        )
+
+                else:
+                    parsed_http = parse_httpx_output(
+                        httpx_res.stdout
+                    )
+
+                    typer.echo(
+                        f"[ok] httpx results "
+                        f"(discovered ports): "
+                        f"{len(parsed_http.items)}"
+                    )
+
+                    for item in parsed_http.items[:10]:
+                        title = item.title or ""
+
+                        typer.echo(
+                            f" - {item.url} "
+                            f"[{item.status_code}] "
+                            f"{title}".rstrip()
+                        )
+
+                    typer.echo(
+                        f"[saved] httpx raw output: "
+                        f"{raw_dir / 'httpx-ports.jsonl'}"
+                    )
+
+
+    # 11) nmap stage (service enumeration)
     if not services:
         typer.echo("[info] service enumeration disabled (use --services to enable nmap stage).")
         return
