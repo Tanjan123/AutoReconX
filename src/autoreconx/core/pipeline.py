@@ -5,9 +5,14 @@ from urllib.parse import urlparse
 import typer
 
 from autoreconx.core.context import ScanContext
-from autoreconx.modules.dnsx import write_lines
+from autoreconx.modules.dnsx import (
+    build_dnsx_args,
+    parse_dnsx_output,
+    write_lines,
+)
 from autoreconx.modules.httpx_toolkit import (
     build_httpx_toolkit_args,
+    build_web_urls,
     parse_httpx_output,
 )
 from autoreconx.modules.naabu import (
@@ -15,7 +20,14 @@ from autoreconx.modules.naabu import (
     filter_ips,
     parse_naabu_output,
 )
-from autoreconx.modules.nmap import build_nmap_args, parse_nmap_xml
+from autoreconx.modules.nmap import (
+    build_nmap_args,
+    parse_nmap_xml,
+)
+from autoreconx.modules.subfinder import (
+    build_subfinder_args,
+    parse_subfinder_stdout,
+)
 
 
 def extract_requested_path(target: str) -> str:
@@ -339,6 +351,500 @@ def run_ip_pipeline(
         )
 
         for service in nmap_parsed.services[:10]:
+            name = service.service or "unknown"
+
+            typer.echo(
+                f" - {service.ip}:{service.port}/"
+                f"{service.protocol} {name}"
+            )
+
+def run_domain_pipeline(
+    context: ScanContext,
+    *,
+    ports: bool,
+    services: bool,
+    web: bool,
+    allow_public: bool,
+) -> None:
+    """
+    Execute the AutoReconX domain reconnaissance pipeline.
+
+    Current flow:
+        Domain
+          ↓
+        Subfinder
+          ↓
+        dnsx
+          ↓
+        HTTPX hostname probing (optional)
+          ↓
+        Naabu (optional)
+          ↓
+        HTTPX discovered-port probing (optional)
+          ↓
+        Nmap service enumeration (optional)
+    """
+
+    scope = context.scope
+    raw_dir = context.raw_dir
+    runner = context.runner
+
+    # Subfinder
+    typer.echo("[run] subfinder (passive subdomain discovery)")
+
+    args = build_subfinder_args(scope.target)
+
+    try:
+        result = runner.run(
+            args,
+            stdout_path=str(raw_dir / "subfinder.txt"),
+            stderr_path=str(raw_dir / "subfinder.err"),
+        )
+    except FileNotFoundError as exc:
+        typer.echo(f"[warn] {exc}")
+        typer.echo("[hint] install subfinder and ensure it is in PATH")
+        return
+
+    if result.timed_out:
+        typer.echo("[warn] subfinder timed out")
+        return
+
+    if result.returncode != 0:
+        typer.echo(
+            f"[warn] subfinder failed (rc={result.returncode})"
+        )
+        if result.stderr.strip():
+            typer.echo(result.stderr.strip()[:500])
+        return
+
+    parsed = parse_subfinder_stdout(
+        result.stdout,
+        root_domain=scope.target,
+    )
+
+    typer.echo(
+        f"[ok] subdomains discovered: {len(parsed.subdomains)}"
+    )
+
+    for subdomain in parsed.subdomains[:10]:
+        typer.echo(f" - {subdomain}")
+
+    typer.echo(
+        f"[saved] raw output: {raw_dir / 'subfinder.txt'}"
+    )
+
+    # dnsx
+    typer.echo("[run] dnsx (DNS resolution)")
+
+    subdomains_file = raw_dir / "subdomains.txt"
+    write_lines(
+        str(subdomains_file),
+        parsed.subdomains,
+    )
+
+    dnsx_args = build_dnsx_args(
+        str(subdomains_file)
+    )
+
+    try:
+        dnsx_res = runner.run(
+            dnsx_args,
+            timeout=600,
+            stdout_path=str(raw_dir / "dnsx.jsonl"),
+            stderr_path=str(raw_dir / "dnsx.err"),
+        )
+    except FileNotFoundError as exc:
+        typer.echo(f"[warn] {exc}")
+        typer.echo(
+            "[hint] install dnsx and ensure it is in PATH"
+        )
+        return
+
+    if dnsx_res.timed_out:
+        typer.echo("[warn] dnsx timed out")
+        return
+
+    if dnsx_res.returncode != 0:
+        typer.echo(
+            f"[warn] dnsx failed (rc={dnsx_res.returncode})"
+        )
+        if dnsx_res.stderr.strip():
+            typer.echo(dnsx_res.stderr.strip()[:500])
+        return
+
+    resolved = parse_dnsx_output(
+        dnsx_res.stdout,
+        root_domain=scope.target,
+    )
+
+    typer.echo(
+        f"[ok] resolved hosts: {len(resolved.resolved)}"
+    )
+
+    for item in resolved.resolved[:10]:
+        typer.echo(
+            f" - {item.host} -> {', '.join(item.ips)}"
+        )
+
+    typer.echo(
+        f"[saved] dnsx raw output: "
+        f"{raw_dir / 'dnsx.jsonl'}"
+    )
+
+    # HTTPX hostname probing
+    host_seed_urls: list[str] = []
+
+    if web:
+        seed_urls: set[str] = set()
+
+        for host_resolution in resolved.resolved:
+            seed_urls.add(
+                f"http://{host_resolution.host}"
+            )
+            seed_urls.add(
+                f"https://{host_resolution.host}"
+            )
+
+        host_seed_urls = sorted(seed_urls)
+
+        if host_seed_urls:
+            urls_file = raw_dir / "urls-hosts.txt"
+            write_lines(
+                str(urls_file),
+                host_seed_urls,
+            )
+
+            typer.echo(
+                "[run] httpx-toolkit "
+                "(HTTP probing - hostnames) "
+                f"urls={len(host_seed_urls)}"
+            )
+
+            httpx_args = build_httpx_toolkit_args(
+                str(urls_file)
+            )
+
+            try:
+                httpx_res = runner.run(
+                    httpx_args,
+                    timeout=300,
+                    stdout_path=str(
+                        raw_dir / "httpx-hosts.jsonl"
+                    ),
+                    stderr_path=str(
+                        raw_dir / "httpx-hosts.err"
+                    ),
+                )
+            except FileNotFoundError as exc:
+                typer.echo(f"[warn] {exc}")
+            else:
+                if httpx_res.timed_out:
+                    typer.echo(
+                        "[warn] httpx-toolkit timed out "
+                        "(hostnames)"
+                    )
+
+                elif httpx_res.returncode != 0:
+                    typer.echo(
+                        "[warn] httpx-toolkit failed "
+                        f"(rc={httpx_res.returncode})"
+                    )
+
+                else:
+                    http_result = parse_httpx_output(
+                        httpx_res.stdout
+                    )
+
+                    typer.echo(
+                        "[ok] httpx results (hostnames): "
+                        f"{len(http_result.items)}"
+                    )
+
+                    for item in http_result.items[:10]:
+                        title = item.title or ""
+                        server = item.webserver or ""
+
+                        typer.echo(
+                            f" - {item.url} "
+                            f"[{item.status_code}] "
+                            f"{title} {server}".rstrip()
+                        )
+
+                        if item.tech:
+                            typer.echo(
+                                "   tech: "
+                                + ", ".join(item.tech)
+                            )
+
+                    typer.echo(
+                        "[saved] httpx raw output: "
+                        f"{raw_dir / 'httpx-hosts.jsonl'}"
+                    )
+
+    # Port discovery is optional
+    if not ports:
+        typer.echo(
+            "[info] port discovery disabled "
+            "(use --ports to enable naabu stage)."
+        )
+        return
+
+    all_ips: list[str] = []
+
+    for host_resolution in resolved.resolved:
+        all_ips.extend(host_resolution.ips)
+
+    scan_ips = filter_ips(
+        all_ips,
+        allow_public=allow_public,
+    )
+
+    if not scan_ips:
+        typer.echo(
+            "[warn] no IPs eligible for scanning "
+            "(private-only by default)."
+        )
+        typer.echo(
+            "[hint] use --allow-public only if "
+            "you are explicitly authorized."
+        )
+        return
+
+    # Naabu
+    typer.echo(
+        f"[run] naabu (port discovery) "
+        f"targets={len(scan_ips)} "
+        f"allow_public={allow_public}"
+    )
+
+    ips_file = raw_dir / "ips.txt"
+    write_lines(str(ips_file), scan_ips)
+
+    naabu_args = build_naabu_args(
+        str(ips_file),
+        top_ports=1000,
+        rate=200,
+    )
+
+    try:
+        naabu_res = runner.run(
+            naabu_args,
+            timeout=600,
+            stdout_path=str(raw_dir / "naabu.jsonl"),
+            stderr_path=str(raw_dir / "naabu.err"),
+        )
+    except FileNotFoundError as exc:
+        typer.echo(f"[warn] {exc}")
+        typer.echo(
+            "[hint] install naabu and ensure it is in PATH"
+        )
+        return
+
+    if naabu_res.timed_out:
+        typer.echo("[warn] naabu timed out")
+        return
+
+    if naabu_res.returncode != 0:
+        typer.echo(
+            f"[warn] naabu failed "
+            f"(rc={naabu_res.returncode})"
+        )
+        if naabu_res.stderr.strip():
+            typer.echo(
+                naabu_res.stderr.strip()[:500]
+            )
+        return
+
+    open_ports = parse_naabu_output(
+        naabu_res.stdout
+    )
+
+    typer.echo(
+        f"[ok] open ports found: "
+        f"{len(open_ports.open_ports)}"
+    )
+
+    for item in open_ports.open_ports[:10]:
+        typer.echo(
+            f" - {item.ip}:{item.port}"
+        )
+
+    typer.echo(
+        f"[saved] naabu raw output: "
+        f"{raw_dir / 'naabu.jsonl'}"
+    )
+
+    # Second HTTPX pass for web ports found by Naabu
+    if web:
+        discovered_urls = set(
+            build_web_urls(
+                resolved.resolved,
+                open_ports.open_ports,
+            )
+        )
+
+        extra_urls = sorted(
+            discovered_urls - set(host_seed_urls)
+        )
+
+        if extra_urls:
+            urls_file = raw_dir / "urls-ports.txt"
+
+            write_lines(
+                str(urls_file),
+                extra_urls,
+            )
+
+            typer.echo(
+                "[run] httpx-toolkit "
+                "(HTTP probing - discovered ports) "
+                f"urls={len(extra_urls)}"
+            )
+
+            httpx_args = build_httpx_toolkit_args(
+                str(urls_file)
+            )
+
+            try:
+                httpx_res = runner.run(
+                    httpx_args,
+                    timeout=300,
+                    stdout_path=str(
+                        raw_dir / "httpx-ports.jsonl"
+                    ),
+                    stderr_path=str(
+                        raw_dir / "httpx-ports.err"
+                    ),
+                )
+            except FileNotFoundError as exc:
+                typer.echo(f"[warn] {exc}")
+            else:
+                if httpx_res.timed_out:
+                    typer.echo(
+                        "[warn] httpx-toolkit timed out "
+                        "(discovered ports)"
+                    )
+
+                elif httpx_res.returncode != 0:
+                    typer.echo(
+                        "[warn] httpx-toolkit failed "
+                        f"(rc={httpx_res.returncode})"
+                    )
+
+                else:
+                    http_result = parse_httpx_output(
+                        httpx_res.stdout
+                    )
+
+                    typer.echo(
+                        "[ok] httpx results "
+                        "(discovered ports): "
+                        f"{len(http_result.items)}"
+                    )
+
+                    for item in http_result.items[:10]:
+                        title = item.title or ""
+
+                        typer.echo(
+                            f" - {item.url} "
+                            f"[{item.status_code}] "
+                            f"{title}".rstrip()
+                        )
+
+                    typer.echo(
+                        "[saved] httpx raw output: "
+                        f"{raw_dir / 'httpx-ports.jsonl'}"
+                    )
+
+    # Nmap is optional
+    if not services:
+        typer.echo(
+            "[info] service enumeration disabled "
+            "(use --services to enable nmap stage)."
+        )
+        return
+
+    if not open_ports.open_ports:
+        typer.echo(
+            "[info] no open ports available "
+            "for nmap service enumeration."
+        )
+        return
+
+    ports_by_ip: dict[str, list[int]] = {}
+
+    for item in open_ports.open_ports:
+        ports_by_ip.setdefault(
+            item.ip,
+            [],
+        ).append(item.port)
+
+    typer.echo(
+        "[run] nmap (service enumeration) "
+        f"hosts={len(ports_by_ip)}"
+    )
+
+    for ip, port_list in ports_by_ip.items():
+        typer.echo(
+            f"[run] nmap {ip} "
+            f"ports={sorted(set(port_list))}"
+        )
+
+        xml_path = raw_dir / f"nmap-{ip}.xml"
+
+        nmap_args = build_nmap_args(
+            ip,
+            port_list,
+            xml_out=str(xml_path),
+        )
+
+        try:
+            nmap_res = runner.run(
+                nmap_args,
+                timeout=900,
+                stdout_path=str(
+                    raw_dir / f"nmap-{ip}.stdout"
+                ),
+                stderr_path=str(
+                    raw_dir / f"nmap-{ip}.err"
+                ),
+            )
+        except FileNotFoundError as exc:
+            typer.echo(f"[warn] {exc}")
+            continue
+
+        if nmap_res.timed_out:
+            typer.echo(
+                f"[warn] nmap timed out for {ip}"
+            )
+            continue
+
+        if nmap_res.returncode != 0:
+            typer.echo(
+                f"[warn] nmap failed for {ip} "
+                f"(rc={nmap_res.returncode})"
+            )
+            continue
+
+        if not xml_path.exists():
+            typer.echo(
+                f"[warn] nmap XML output missing for {ip}"
+            )
+            continue
+
+        xml_text = xml_path.read_text(
+            encoding="utf-8",
+            errors="replace",
+        )
+
+        nmap_result = parse_nmap_xml(xml_text)
+
+        typer.echo(
+            f"[ok] {ip} services: "
+            f"{len(nmap_result.services)}"
+        )
+
+        for service in nmap_result.services[:10]:
             name = service.service or "unknown"
 
             typer.echo(
