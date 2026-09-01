@@ -9,6 +9,7 @@ from autoreconx.modules.httpx_toolkit import (
     build_httpx_toolkit_args,
     parse_httpx_output,
 )
+from autoreconx.normalization import normalize_web_assets
 
 
 def run_http_probe(
@@ -126,6 +127,10 @@ def run_http_probe(
     typer.echo(
         f"[saved] httpx raw output: "
         f"{raw_dir / f'{evidence_name}.jsonl'}"
+    )
+
+    context.result.web_assets.extend(
+        normalize_web_assets(parsed.items)
     )
 
     return parsed

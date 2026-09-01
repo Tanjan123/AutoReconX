@@ -13,6 +13,10 @@ from autoreconx.modules.subfinder import (
     build_subfinder_args,
     parse_subfinder_stdout,
 )
+from autoreconx.normalization import (
+    normalize_resolutions,
+    normalize_subdomains,
+)
 
 
 def run_subfinder(context: ScanContext) -> tuple[str, ...]:
@@ -62,6 +66,10 @@ def run_subfinder(context: ScanContext) -> tuple[str, ...]:
         typer.echo(f" - {subdomain}")
 
     typer.echo(f"[saved] raw output: {raw_dir / 'subfinder.txt'}")
+   
+    context.result.domains.extend(
+        normalize_subdomains(parsed.subdomains)
+    )
 
     return parsed.subdomains
 
@@ -142,5 +150,12 @@ def run_dns_resolution(
         f"[saved] dnsx raw output: "
         f"{raw_dir / 'dnsx.jsonl'}"
     )
+
+    normalized_domains, normalized_ips = normalize_resolutions(
+        resolved.resolved
+    )
+
+    context.result.domains.extend(normalized_domains)
+    context.result.ips.extend(normalized_ips)
 
     return resolved

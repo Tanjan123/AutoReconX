@@ -11,6 +11,7 @@ from autoreconx.modules.katana import (
     build_katana_args,
     parse_katana_output,
 )
+from autoreconx.normalization import normalize_endpoints
 
 
 def _allowed_hosts(seed_urls: tuple[str, ...]) -> set[str]:
@@ -135,6 +136,10 @@ def run_crawl(
     typer.echo(
         f"[saved] katana raw output: "
         f"{raw_dir / f'{evidence_name}.jsonl'}"
+    )
+
+    context.result.endpoints.extend(
+        normalize_endpoints(endpoints)
     )
 
     return endpoints

@@ -9,6 +9,7 @@ from autoreconx.modules.nmap import (
     build_nmap_args,
     parse_nmap_xml,
 )
+from autoreconx.normalization import normalize_services
 
 
 def run_service_enumeration(
@@ -106,5 +107,9 @@ def run_service_enumeration(
             )
 
         discovered_services.extend(parsed.services)
+
+    context.result.services.extend(
+        normalize_services(discovered_services)
+    )
 
     return tuple(discovered_services)

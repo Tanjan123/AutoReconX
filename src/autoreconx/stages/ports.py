@@ -10,6 +10,7 @@ from autoreconx.modules.naabu import (
     filter_ips,
     parse_naabu_output,
 )
+from autoreconx.normalization import normalize_ports
 
 
 def run_port_discovery(
@@ -111,6 +112,10 @@ def run_port_discovery(
     typer.echo(
         f"[saved] naabu raw output: "
         f"{raw_dir / 'naabu.jsonl'}"
+    )
+
+    context.result.ports.extend(
+        normalize_ports(parsed.open_ports)
     )
 
     return parsed
