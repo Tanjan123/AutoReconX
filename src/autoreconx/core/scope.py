@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import ipaddress
 import re
+from collections.abc import Iterable
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable, Optional
 from urllib.parse import urlparse
 
 
@@ -108,7 +108,7 @@ class Scope:
 def parse_scope(
     raw_target: str,
     *,
-    exclude: Optional[Iterable[str]] = None,
+    exclude: Iterable[str] | None = None,
 ) -> Scope:
     """
     Build a Scope object from a user-provided target and optional exclusions.

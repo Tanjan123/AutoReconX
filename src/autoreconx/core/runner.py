@@ -3,9 +3,9 @@ from __future__ import annotations
 import shutil
 import subprocess
 import time
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Mapping, Sequence
 
 
 @dataclass(frozen=True)
@@ -65,6 +65,7 @@ class CommandRunner:
                 capture_output=True,
                 timeout=timeout if timeout is not None else self.default_timeout,
                 shell=False,
+                check=False,
             )
             rc = proc.returncode
             out = proc.stdout or ""

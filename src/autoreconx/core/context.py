@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from autoreconx.core.runner import CommandRunner
@@ -36,8 +36,7 @@ def create_scan_context(
     Create the workspace and shared execution context for one scan.
     """
 
-    scan_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
-
+    scan_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     workspace = workspace_root / scan_id
     raw_dir = workspace / "raw"
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Iterable
 
 from autoreconx.core.scope import is_valid_domain, normalize_domain
 

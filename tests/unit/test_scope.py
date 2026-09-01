@@ -1,5 +1,6 @@
 import pytest
-from autoreconx.core.scope import parse_scope, TargetKind, is_subdomain_of
+
+from autoreconx.core.scope import TargetKind, is_subdomain_of, parse_scope
 
 
 def test_parse_domain_scope():

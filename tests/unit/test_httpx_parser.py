@@ -1,7 +1,7 @@
-from autoreconx.modules.httpx_toolkit import parse_httpx_output
 from autoreconx.modules.dnsx import HostResolution
+from autoreconx.modules.httpx_toolkit import build_web_urls, parse_httpx_output
 from autoreconx.modules.naabu import OpenPort
-from autoreconx.modules.httpx_toolkit import build_web_urls
+
 
 def test_parse_httpx_json_lines():
     sample = """
