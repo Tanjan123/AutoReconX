@@ -1,10 +1,6 @@
 import typer
 from . import __version__
 from autoreconx.core.scope import parse_scope
-from pathlib import Path
-from datetime import datetime
-
-from autoreconx.core.runner import CommandRunner
 from autoreconx.modules.subfinder import build_subfinder_args, parse_subfinder_stdout
 from autoreconx.core.scope import TargetKind
 from autoreconx.modules.dnsx import build_dnsx_args, parse_dnsx_output, write_lines
@@ -12,6 +8,7 @@ from autoreconx.modules.naabu import build_naabu_args, filter_ips, parse_naabu_o
 from autoreconx.modules.nmap import build_nmap_args, parse_nmap_xml
 from urllib.parse import urlparse
 from autoreconx.modules.httpx_toolkit import build_httpx_toolkit_args, parse_httpx_output, build_web_urls
+from autoreconx.core.context import create_scan_context
 
 app = typer.Typer(
     name="autoreconx",
@@ -51,13 +48,10 @@ def scan(
     typer.echo(f"[scope OK] kind={scope.kind} target={scope.target}")
 
     # Create workspace for ALL scan types (domain/ip/cidr)
-    scan_id = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
-    workspace = Path("workspaces") / scan_id
-    raw_dir = workspace / "raw"
-    raw_dir.mkdir(parents=True, exist_ok=True)
+    context = create_scan_context(target, scope)
 
-    # Central runner for ALL stages
-    runner = CommandRunner(default_timeout=120)
+    raw_dir = context.raw_dir
+    runner = context.runner
 
     # --- IP MODE (local/lab target) ---
     if scope.kind == TargetKind.IP:
