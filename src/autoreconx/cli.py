@@ -4,7 +4,11 @@ from autoreconx.core.context import create_scan_context
 from autoreconx.core.finalize import finalize_scan
 from autoreconx.core.pipeline import run_domain_pipeline, run_ip_pipeline
 from autoreconx.core.scope import TargetKind, parse_scope
-from autoreconx.reporting import print_scan_summary
+from autoreconx.prioritization import prioritize_scan
+from autoreconx.reporting import (
+    print_priority_summary,
+    print_scan_summary,
+)
 
 from . import __version__
 
@@ -58,6 +62,8 @@ def scan(
         )
         correlated = finalize_scan(context)
         print_scan_summary(correlated)
+        priority_items = prioritize_scan(correlated)
+        print_priority_summary(priority_items)
         return
 
     # Domain reconnaissance pipeline
@@ -72,6 +78,8 @@ def scan(
         )
         correlated = finalize_scan(context)
         print_scan_summary(correlated)
+        priority_items = prioritize_scan(correlated)
+        print_priority_summary(priority_items)
         return
 
     typer.echo(
