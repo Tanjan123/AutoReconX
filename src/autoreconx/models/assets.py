@@ -88,3 +88,14 @@ class EndpointAsset:
     path: str | None = None
     source: str = "unknown"
     discovered_at: datetime = field(default_factory=utc_now)
+
+@dataclass(frozen=True)
+class DNSResolution:
+    """
+    Normalized DNS relationship between a hostname and an IP address.
+    """
+
+    hostname: str
+    address: str
+    source: str = "dnsx"
+    discovered_at: datetime = field(default_factory=utc_now)

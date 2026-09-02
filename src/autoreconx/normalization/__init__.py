@@ -1,4 +1,5 @@
 from autoreconx.normalization.normalizers import (
+    normalize_dns_relationships,
     normalize_endpoints,
     normalize_ports,
     normalize_resolutions,
@@ -8,6 +9,7 @@ from autoreconx.normalization.normalizers import (
 )
 
 __all__ = [
+    "normalize_dns_relationships",
     "normalize_endpoints",
     "normalize_ports",
     "normalize_resolutions",

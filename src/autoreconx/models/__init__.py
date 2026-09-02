@@ -1,4 +1,5 @@
 from autoreconx.models.assets import (
+    DNSResolution,
     DomainAsset,
     EndpointAsset,
     IPAsset,
@@ -9,6 +10,7 @@ from autoreconx.models.assets import (
 from autoreconx.models.scan import ScanResult
 
 __all__ = [
+    "DNSResolution",
     "DomainAsset",
     "EndpointAsset",
     "IPAsset",

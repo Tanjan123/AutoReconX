@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from autoreconx.models.assets import (
+    DNSResolution,
     DomainAsset,
     EndpointAsset,
     IPAsset,
@@ -45,5 +46,9 @@ class ScanResult:
     )
 
     endpoints: list[EndpointAsset] = field(
+        default_factory=list
+    )
+
+    dns_resolutions: list[DNSResolution] = field(
         default_factory=list
     )

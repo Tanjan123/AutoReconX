@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from autoreconx.models import (
+    DNSResolution,
     DomainAsset,
     EndpointAsset,
     IPAsset,
@@ -187,6 +188,49 @@ def normalize_endpoints(
             path=item.path,
             source="katana",
         )
+
+    return [
+        unique[key]
+        for key in sorted(unique)
+    ]
+
+def normalize_dns_relationships(
+    resolutions: Iterable[HostResolution],
+) -> list[DNSResolution]:
+    """Preserve hostname -> IP relationships discovered by dnsx."""
+
+    unique: dict[
+        tuple[str, str],
+        DNSResolution,
+    ] = {}
+
+    for resolution in resolutions:
+        hostname = (
+            resolution.host
+            .strip()
+            .lower()
+            .rstrip(".")
+        )
+
+        if not hostname:
+            continue
+
+        for address in resolution.ips:
+            address = address.strip()
+
+            if not address:
+                continue
+
+            key = (
+                hostname,
+                address,
+            )
+
+            unique[key] = DNSResolution(
+                hostname=hostname,
+                address=address,
+                source="dnsx",
+            )
 
     return [
         unique[key]

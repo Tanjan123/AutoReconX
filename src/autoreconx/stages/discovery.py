@@ -14,6 +14,7 @@ from autoreconx.modules.subfinder import (
     parse_subfinder_stdout,
 )
 from autoreconx.normalization import (
+    normalize_dns_relationships,
     normalize_resolutions,
     normalize_subdomains,
 )
@@ -157,5 +158,10 @@ def run_dns_resolution(
 
     context.result.domains.extend(normalized_domains)
     context.result.ips.extend(normalized_ips)
+    context.result.dns_resolutions.extend(
+        normalize_dns_relationships(
+            resolved.resolved
+        )
+    )
 
     return resolved

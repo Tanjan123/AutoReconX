@@ -4,6 +4,7 @@ from autoreconx.modules.katana import KatanaEndpoint
 from autoreconx.modules.naabu import OpenPort
 from autoreconx.modules.nmap import NmapService
 from autoreconx.normalization import (
+    normalize_dns_relationships,
     normalize_endpoints,
     normalize_ports,
     normalize_resolutions,
@@ -112,3 +113,16 @@ def test_normalize_endpoints_deduplicates():
 
     assert len(result) == 1
     assert result[0].path == "/login"
+
+def test_normalize_dns_relationships():
+    relationships = normalize_dns_relationships(
+        [
+            HostResolution(
+                host="API.EXAMPLE.COM",
+                ips=("10.0.0.1", "10.0.0.2"),
+            )
+        ]
+    )
+
+    assert len(relationships) == 2
+    assert relationships[0].hostname == "api.example.com"

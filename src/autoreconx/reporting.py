@@ -20,3 +20,6 @@ def print_scan_summary(result: ScanResult) -> None:
     typer.echo(f" services:     {len(correlated.services)}")
     typer.echo(f" web apps:     {len(correlated.web_assets)}")
     typer.echo(f" endpoints:    {len(correlated.endpoints)}")
+    typer.echo(
+        f" relationships: {len(correlated.relationships)}"
+    )
