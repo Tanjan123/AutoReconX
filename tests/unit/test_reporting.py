@@ -19,6 +19,6 @@ def test_print_scan_summary(capsys):
 
     output = capsys.readouterr().out
 
-    assert "normalized attack surface" in output
+    assert "correlated attack surface" in output
     assert "example.com" in output
     assert "domains:" in output
