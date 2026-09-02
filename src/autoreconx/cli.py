@@ -6,6 +6,7 @@ from autoreconx.core.pipeline import run_domain_pipeline, run_ip_pipeline
 from autoreconx.core.scope import TargetKind, parse_scope
 from autoreconx.prioritization import prioritize_scan
 from autoreconx.reporting import (
+    generate_reports,
     print_priority_summary,
     print_scan_summary,
 )
@@ -64,6 +65,15 @@ def scan(
         print_scan_summary(correlated)
         priority_items = prioritize_scan(correlated)
         print_priority_summary(priority_items)
+        json_report, html_report = generate_reports(
+            correlated,
+            priority_items,
+            context.report_dir,
+        )
+
+        typer.echo("")
+        typer.echo(f"[saved] JSON report: {json_report}")
+        typer.echo(f"[saved] HTML report: {html_report}")
         return
 
     # Domain reconnaissance pipeline
@@ -80,6 +90,15 @@ def scan(
         print_scan_summary(correlated)
         priority_items = prioritize_scan(correlated)
         print_priority_summary(priority_items)
+        json_report, html_report = generate_reports(
+            correlated,
+            priority_items,
+            context.report_dir,
+        )
+
+        typer.echo("")
+        typer.echo(f"[saved] JSON report: {json_report}")
+        typer.echo(f"[saved] HTML report: {html_report}")
         return
 
     typer.echo(

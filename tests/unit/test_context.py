@@ -32,7 +32,11 @@ def test_create_scan_context(tmp_path: Path):
     assert context.database_path == (
     context.workspace / "autoreconx.db"
     )
- 
+    assert context.report_dir == (
+    context.workspace / "reports"
+    ) 
+
+
 def test_create_scan_context_seeds_ip_target(tmp_path: Path):
     scope = parse_scope("127.0.0.1")
 
