@@ -43,7 +43,7 @@ These are external programs and must be installed separately if the selected sca
 Clone the repository:
 
 ```bash
-git clone <YOUR-GITHUB-REPOSITORY-URL>
+git clone https://github.com/Tanjan123/AutoReconX.git
 cd AutoReconX
 ```
 
