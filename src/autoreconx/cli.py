@@ -1,6 +1,7 @@
 import typer
 
 from autoreconx.core.context import create_scan_context
+from autoreconx.core.finalize import finalize_scan
 from autoreconx.core.pipeline import run_domain_pipeline, run_ip_pipeline
 from autoreconx.core.scope import TargetKind, parse_scope
 from autoreconx.reporting import print_scan_summary
@@ -55,7 +56,8 @@ def scan(
             crawl=crawl,
             allow_public=allow_public,
         )
-        print_scan_summary(context.result)
+        correlated = finalize_scan(context)
+        print_scan_summary(correlated)
         return
 
     # Domain reconnaissance pipeline
@@ -68,7 +70,8 @@ def scan(
             crawl=crawl,
             allow_public=allow_public,
         )
-        print_scan_summary(context.result)
+        correlated = finalize_scan(context)
+        print_scan_summary(correlated)
         return
 
     typer.echo(

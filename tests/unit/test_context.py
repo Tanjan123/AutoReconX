@@ -29,6 +29,9 @@ def test_create_scan_context(tmp_path: Path):
     assert len(context.result.domains) == 1
     assert context.result.domains[0].hostname == "example.com"
     assert context.result.domains[0].source == "target"
+    assert context.database_path == (
+    context.workspace / "autoreconx.db"
+    )
  
 def test_create_scan_context_seeds_ip_target(tmp_path: Path):
     scope = parse_scope("127.0.0.1")

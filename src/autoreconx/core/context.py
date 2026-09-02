@@ -25,7 +25,7 @@ class ScanContext:
     raw_dir: Path
     runner: CommandRunner
     result: ScanResult
-
+    database_path: Path
 
 def create_scan_context(
     original_target: str,
@@ -41,6 +41,7 @@ def create_scan_context(
     scan_id = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
     workspace = workspace_root / scan_id
     raw_dir = workspace / "raw"
+    database_path = workspace / "autoreconx.db"
 
     raw_dir.mkdir(parents=True, exist_ok=True)
 
@@ -73,7 +74,9 @@ def create_scan_context(
         original_target=original_target,
         scope=scope,
         workspace=workspace,
+        database_path=database_path,
         raw_dir=raw_dir,
         runner=runner,
         result=result,
     )
+

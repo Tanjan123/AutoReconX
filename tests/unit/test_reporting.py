@@ -1,3 +1,4 @@
+from autoreconx.correlation import correlate_scan
 from autoreconx.models import DomainAsset, ScanResult
 from autoreconx.reporting import print_scan_summary
 
@@ -15,8 +16,8 @@ def test_print_scan_summary(capsys):
         )
     )
 
-    print_scan_summary(result)
-
+    correlated = correlate_scan(result)
+    print_scan_summary(correlated)
     output = capsys.readouterr().out
 
     assert "correlated attack surface" in output
