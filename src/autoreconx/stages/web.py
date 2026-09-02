@@ -30,18 +30,11 @@ def run_http_probe(
     runner = context.runner
 
     unique_urls = sorted(
-        {
-            url.strip()
-            for url in urls
-            if isinstance(url, str) and url.strip()
-        }
+        {url.strip() for url in urls if isinstance(url, str) and url.strip()}
     )
 
     if not unique_urls:
-        typer.echo(
-            "[info] no URLs available "
-            "for HTTP probing."
-        )
+        typer.echo("[info] no URLs available for HTTP probing.")
         return None
 
     urls_file = raw_dir / f"{evidence_name}-urls.txt"
@@ -51,89 +44,55 @@ def run_http_probe(
         unique_urls,
     )
 
-    typer.echo(
-        f"[run] httpx-toolkit ({label}) "
-        f"urls={len(unique_urls)}"
-    )
+    typer.echo(f"[run] httpx-toolkit ({label}) urls={len(unique_urls)}")
 
-    args = build_httpx_toolkit_args(
-        str(urls_file)
-    )
+    args = build_httpx_toolkit_args(str(urls_file))
 
     try:
         result = runner.run(
             args,
             timeout=300,
-            stdout_path=str(
-                raw_dir / f"{evidence_name}.jsonl"
-            ),
-            stderr_path=str(
-                raw_dir / f"{evidence_name}.err"
-            ),
+            stdout_path=str(raw_dir / f"{evidence_name}.jsonl"),
+            stderr_path=str(raw_dir / f"{evidence_name}.err"),
         )
     except FileNotFoundError as exc:
         typer.echo(f"[warn] {exc}")
         typer.echo(
-            "[hint] install ProjectDiscovery "
-            "httpx-toolkit and ensure it is in PATH"
+            "[hint] install ProjectDiscovery httpx-toolkit and ensure it is in PATH"
         )
         return None
 
     if result.timed_out:
-        typer.echo(
-            f"[warn] httpx-toolkit timed out "
-            f"({label})"
-        )
+        typer.echo(f"[warn] httpx-toolkit timed out ({label})")
         return None
 
     if result.returncode != 0:
-        typer.echo(
-            f"[warn] httpx-toolkit failed "
-            f"(rc={result.returncode})"
-        )
+        typer.echo(f"[warn] httpx-toolkit failed (rc={result.returncode})")
 
         if result.stderr.strip():
-            typer.echo(
-                result.stderr.strip()[:500]
-            )
+            typer.echo(result.stderr.strip()[:500])
 
         return None
 
-    parsed = parse_httpx_output(
-        result.stdout
-    )
+    parsed = parse_httpx_output(result.stdout)
 
-    typer.echo(
-        f"[ok] httpx results: "
-        f"{len(parsed.items)}"
-    )
+    typer.echo(f"[ok] httpx results: {len(parsed.items)}")
 
     for item in parsed.items[:10]:
         title = item.title or ""
         server = item.webserver or ""
 
-        typer.echo(
-            f" - {item.url} "
-            f"[{item.status_code}] "
-            f"{title} {server}".rstrip()
-        )
+        typer.echo(f" - {item.url} [{item.status_code}] {title} {server}".rstrip())
 
         if item.tech:
-            typer.echo(
-                "   tech: "
-                + ", ".join(item.tech)
-            )
+            typer.echo("   tech: " + ", ".join(item.tech))
 
-    typer.echo(
-        f"[saved] httpx raw output: "
-        f"{raw_dir / f'{evidence_name}.jsonl'}"
-    )
+    typer.echo(f"[saved] httpx raw output: {raw_dir / f'{evidence_name}.jsonl'}")
 
-    context.result.web_assets.extend(
-        normalize_web_assets(parsed.items)
-    )
+    context.result.web_assets.extend(normalize_web_assets(parsed.items))
 
     return parsed
+
 
 def build_ip_web_urls(
     ip: str,
@@ -161,26 +120,16 @@ def build_ip_web_urls(
         if item.port not in web_ports:
             continue
 
-        scheme = (
-            "https"
-            if item.port in {443, 8443}
-            else "http"
-        )
+        scheme = "https" if item.port in {443, 8443} else "http"
 
-        if (
-            (scheme == "http" and item.port == 80)
-            or
-            (scheme == "https" and item.port == 443)
+        if (scheme == "http" and item.port == 80) or (
+            scheme == "https" and item.port == 443
         ):
             base = f"{scheme}://{ip}"
         else:
-            base = (
-                f"{scheme}://{ip}:{item.port}"
-            )
+            base = f"{scheme}://{ip}:{item.port}"
 
-        urls.add(
-            base + requested_path
-        )
+        urls.add(base + requested_path)
 
     return tuple(sorted(urls))
 

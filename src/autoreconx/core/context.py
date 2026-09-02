@@ -28,6 +28,7 @@ class ScanContext:
     database_path: Path
     report_dir: Path
 
+
 def create_scan_context(
     original_target: str,
     scope: Scope,
@@ -48,7 +49,7 @@ def create_scan_context(
     raw_dir.mkdir(parents=True, exist_ok=True)
 
     runner = CommandRunner(default_timeout=default_timeout)
-   
+
     result = ScanResult(
         scan_id=scan_id,
         target=scope.target,
@@ -82,4 +83,3 @@ def create_scan_context(
         report_dir=report_dir,
         result=result,
     )
-

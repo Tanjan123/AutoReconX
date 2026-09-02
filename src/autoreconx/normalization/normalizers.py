@@ -79,11 +79,7 @@ def normalize_ports(
 ) -> list[PortAsset]:
     """Convert Naabu results into normalized port assets."""
 
-    unique = {
-        (item.ip.strip(), item.port)
-        for item in open_ports
-        if item.ip.strip()
-    }
+    unique = {(item.ip.strip(), item.port) for item in open_ports if item.ip.strip()}
 
     return [
         PortAsset(
@@ -123,10 +119,7 @@ def normalize_services(
             source="nmap",
         )
 
-    return [
-        unique[key]
-        for key in sorted(unique)
-    ]
+    return [unique[key] for key in sorted(unique)]
 
 
 def normalize_web_assets(
@@ -155,10 +148,7 @@ def normalize_web_assets(
             source="httpx",
         )
 
-    return [
-        unique[url]
-        for url in sorted(unique)
-    ]
+    return [unique[url] for url in sorted(unique)]
 
 
 def normalize_endpoints(
@@ -189,10 +179,8 @@ def normalize_endpoints(
             source="katana",
         )
 
-    return [
-        unique[key]
-        for key in sorted(unique)
-    ]
+    return [unique[key] for key in sorted(unique)]
+
 
 def normalize_dns_relationships(
     resolutions: Iterable[HostResolution],
@@ -205,12 +193,7 @@ def normalize_dns_relationships(
     ] = {}
 
     for resolution in resolutions:
-        hostname = (
-            resolution.host
-            .strip()
-            .lower()
-            .rstrip(".")
-        )
+        hostname = resolution.host.strip().lower().rstrip(".")
 
         if not hostname:
             continue
@@ -232,7 +215,4 @@ def normalize_dns_relationships(
                 source="dnsx",
             )
 
-    return [
-        unique[key]
-        for key in sorted(unique)
-    ]
+    return [unique[key] for key in sorted(unique)]

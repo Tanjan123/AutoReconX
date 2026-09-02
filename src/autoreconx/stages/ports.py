@@ -37,9 +37,7 @@ def run_port_discovery(
     )
 
     if not scan_ips:
-        typer.echo(
-            "[warn] no IPs eligible for port scanning."
-        )
+        typer.echo("[warn] no IPs eligible for port scanning.")
 
         if not allow_public:
             typer.echo(
@@ -77,9 +75,7 @@ def run_port_discovery(
         )
     except FileNotFoundError as exc:
         typer.echo(f"[warn] {exc}")
-        typer.echo(
-            "[hint] install naabu and ensure it is in PATH"
-        )
+        typer.echo("[hint] install naabu and ensure it is in PATH")
         return None
 
     if result.timed_out:
@@ -87,10 +83,7 @@ def run_port_discovery(
         return None
 
     if result.returncode != 0:
-        typer.echo(
-            f"[warn] naabu failed "
-            f"(rc={result.returncode})"
-        )
+        typer.echo(f"[warn] naabu failed (rc={result.returncode})")
 
         if result.stderr.strip():
             typer.echo(result.stderr.strip()[:500])
@@ -99,23 +92,13 @@ def run_port_discovery(
 
     parsed = parse_naabu_output(result.stdout)
 
-    typer.echo(
-        f"[ok] open ports found: "
-        f"{len(parsed.open_ports)}"
-    )
+    typer.echo(f"[ok] open ports found: {len(parsed.open_ports)}")
 
     for item in parsed.open_ports[:10]:
-        typer.echo(
-            f" - {item.ip}:{item.port}"
-        )
+        typer.echo(f" - {item.ip}:{item.port}")
 
-    typer.echo(
-        f"[saved] naabu raw output: "
-        f"{raw_dir / 'naabu.jsonl'}"
-    )
+    typer.echo(f"[saved] naabu raw output: {raw_dir / 'naabu.jsonl'}")
 
-    context.result.ports.extend(
-        normalize_ports(parsed.open_ports)
-    )
+    context.result.ports.extend(normalize_ports(parsed.open_ports))
 
     return parsed

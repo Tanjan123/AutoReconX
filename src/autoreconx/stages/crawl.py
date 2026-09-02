@@ -45,13 +45,7 @@ def run_crawl(
     runner = context.runner
 
     seed_urls = tuple(
-        sorted(
-            {
-                url.strip()
-                for url in urls
-                if isinstance(url, str) and url.strip()
-            }
-        )
+        sorted({url.strip() for url in urls if isinstance(url, str) and url.strip()})
     )
 
     if not seed_urls:
@@ -67,10 +61,7 @@ def run_crawl(
         seed_urls,
     )
 
-    typer.echo(
-        f"[run] katana (web crawling) "
-        f"urls={len(seed_urls)} depth={depth}"
-    )
+    typer.echo(f"[run] katana (web crawling) urls={len(seed_urls)} depth={depth}")
 
     args = build_katana_args(
         str(urls_file),
@@ -81,19 +72,12 @@ def run_crawl(
         result = runner.run(
             args,
             timeout=600,
-            stdout_path=str(
-                raw_dir / f"{evidence_name}.jsonl"
-            ),
-            stderr_path=str(
-                raw_dir / f"{evidence_name}.err"
-            ),
+            stdout_path=str(raw_dir / f"{evidence_name}.jsonl"),
+            stderr_path=str(raw_dir / f"{evidence_name}.err"),
         )
     except FileNotFoundError as exc:
         typer.echo(f"[warn] {exc}")
-        typer.echo(
-            "[hint] install ProjectDiscovery katana "
-            "and ensure it is in PATH"
-        )
+        typer.echo("[hint] install ProjectDiscovery katana and ensure it is in PATH")
         return ()
 
     if result.timed_out:
@@ -101,19 +85,14 @@ def run_crawl(
         return ()
 
     if result.returncode != 0:
-        typer.echo(
-            f"[warn] katana failed "
-            f"(rc={result.returncode})"
-        )
+        typer.echo(f"[warn] katana failed (rc={result.returncode})")
 
         if result.stderr.strip():
             typer.echo(result.stderr.strip()[:500])
 
         return ()
 
-    parsed = parse_katana_output(
-        result.stdout
-    )
+    parsed = parse_katana_output(result.stdout)
 
     filtered: list[KatanaEndpoint] = []
 
@@ -123,23 +102,13 @@ def run_crawl(
 
     endpoints = tuple(filtered)
 
-    typer.echo(
-        f"[ok] endpoints discovered: "
-        f"{len(endpoints)}"
-    )
+    typer.echo(f"[ok] endpoints discovered: {len(endpoints)}")
 
     for endpoint in endpoints[:15]:
-        typer.echo(
-            f" - {endpoint.method} {endpoint.url}"
-        )
+        typer.echo(f" - {endpoint.method} {endpoint.url}")
 
-    typer.echo(
-        f"[saved] katana raw output: "
-        f"{raw_dir / f'{evidence_name}.jsonl'}"
-    )
+    typer.echo(f"[saved] katana raw output: {raw_dir / f'{evidence_name}.jsonl'}")
 
-    context.result.endpoints.extend(
-        normalize_endpoints(endpoints)
-    )
+    context.result.endpoints.extend(normalize_endpoints(endpoints))
 
     return endpoints

@@ -74,7 +74,9 @@ def parse_httpx_output(output: str) -> HttpxResult:
         tech_val = obj.get("tech")
         tech: tuple[str, ...] = ()
         if isinstance(tech_val, list):
-            tech = tuple(sorted({t for t in tech_val if isinstance(t, str) and t.strip()}))
+            tech = tuple(
+                sorted({t for t in tech_val if isinstance(t, str) and t.strip()})
+            )
 
         items.append(
             HttpxItem(
@@ -87,6 +89,7 @@ def parse_httpx_output(output: str) -> HttpxResult:
         )
 
     return HttpxResult(items=tuple(items))
+
 
 def build_web_urls(
     resolved_hosts,
@@ -121,9 +124,8 @@ def build_web_urls(
             for port in ports_by_ip.get(ip, set()):
                 scheme = "https" if port in {443, 8443} else "http"
 
-                if (
-                    (scheme == "http" and port == 80)
-                    or (scheme == "https" and port == 443)
+                if (scheme == "http" and port == 80) or (
+                    scheme == "https" and port == 443
                 ):
                     url = f"{scheme}://{host}"
                 else:

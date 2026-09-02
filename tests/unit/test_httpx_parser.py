@@ -12,6 +12,7 @@ def test_parse_httpx_json_lines():
     assert res.items[0].status_code == 200
     assert "DVWA" in (res.items[0].title or "")
 
+
 def test_build_web_urls_correlates_hostname_and_port():
     resolved = (
         HostResolution(

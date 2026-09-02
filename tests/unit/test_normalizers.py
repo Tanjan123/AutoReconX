@@ -114,6 +114,7 @@ def test_normalize_endpoints_deduplicates():
     assert len(result) == 1
     assert result[0].path == "/login"
 
+
 def test_normalize_dns_relationships():
     relationships = normalize_dns_relationships(
         [

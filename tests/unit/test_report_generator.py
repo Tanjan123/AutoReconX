@@ -50,19 +50,13 @@ def test_generate_json_and_html_reports(
     assert json_path.exists()
     assert html_path.exists()
 
-    data = json.loads(
-        json_path.read_text(
-            encoding="utf-8"
-        )
-    )
+    data = json.loads(json_path.read_text(encoding="utf-8"))
 
     assert data["target"] == "example.com"
     assert data["summary"]["domains"] == 1
     assert data["summary"]["web_apps"] == 1
 
-    html_content = html_path.read_text(
-        encoding="utf-8"
-    )
+    html_content = html_path.read_text(encoding="utf-8")
 
     assert "AutoReconX" in html_content
     assert "example.com" in html_content

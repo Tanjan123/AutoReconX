@@ -18,30 +18,16 @@ class CorrelatedScanResult:
     scan_id: str
     target: str
 
-    domains: dict[str, CorrelatedDomain] = field(
-        default_factory=dict
-    )
+    domains: dict[str, CorrelatedDomain] = field(default_factory=dict)
 
-    ips: dict[str, CorrelatedIP] = field(
-        default_factory=dict
-    )
+    ips: dict[str, CorrelatedIP] = field(default_factory=dict)
 
-    ports: dict[str, CorrelatedPort] = field(
-        default_factory=dict
-    )
+    ports: dict[str, CorrelatedPort] = field(default_factory=dict)
 
-    services: dict[str, CorrelatedService] = field(
-        default_factory=dict
-    )
+    services: dict[str, CorrelatedService] = field(default_factory=dict)
 
-    web_assets: dict[str, CorrelatedWebAsset] = field(
-        default_factory=dict
-    )
+    web_assets: dict[str, CorrelatedWebAsset] = field(default_factory=dict)
 
-    endpoints: dict[str, CorrelatedEndpoint] = field(
-        default_factory=dict
-    )
+    endpoints: dict[str, CorrelatedEndpoint] = field(default_factory=dict)
 
-    relationships: list[AssetRelationship] = field(
-        default_factory=list
-    )
+    relationships: list[AssetRelationship] = field(default_factory=list)

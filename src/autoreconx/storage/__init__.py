@@ -13,4 +13,3 @@ __all__ = [
     "initialize_database",
     "save_correlated_scan",
 ]
-

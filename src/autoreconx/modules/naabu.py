@@ -36,7 +36,9 @@ def filter_ips(ips: Iterable[str], *, allow_public: bool) -> list[str]:
     return sorted(set(out))
 
 
-def build_naabu_args(input_file: str, *, top_ports: int = 100, rate: int = 200) -> list[str]:
+def build_naabu_args(
+    input_file: str, *, top_ports: int = 100, rate: int = 200
+) -> list[str]:
     """
     Use JSON lines for stable parsing.
     Keep defaults conservative.

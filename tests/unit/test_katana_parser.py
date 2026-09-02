@@ -38,20 +38,11 @@ def test_parse_katana_request_endpoint():
 
     assert len(result.endpoints) == 2
 
-    urls = {
-        endpoint.url
-        for endpoint in result.endpoints
-    }
+    urls = {endpoint.url for endpoint in result.endpoints}
 
-    assert (
-        "http://127.0.0.1/DVWA/index.php"
-        in urls
-    )
+    assert "http://127.0.0.1/DVWA/index.php" in urls
 
-    assert (
-        "http://127.0.0.1/DVWA/login.php"
-        in urls
-    )
+    assert "http://127.0.0.1/DVWA/login.php" in urls
 
 
 def test_parse_katana_deduplicates_urls():

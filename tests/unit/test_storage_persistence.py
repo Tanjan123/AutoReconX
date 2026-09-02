@@ -55,9 +55,7 @@ def test_save_correlated_scan(
 
     correlated = correlate_scan(scan)
 
-    database_path = (
-        tmp_path / "autoreconx.db"
-    )
+    database_path = tmp_path / "autoreconx.db"
 
     save_correlated_scan(
         correlated,
@@ -66,28 +64,17 @@ def test_save_correlated_scan(
 
     assert database_path.exists()
 
-    engine = create_database_engine(
-        database_path
-    )
+    engine = create_database_engine(database_path)
 
-    session_factory = create_session_factory(
-        engine
-    )
+    session_factory = create_session_factory(engine)
 
     with session_factory() as session:
-        scan_count = session.scalar(
-            select(func.count())
-            .select_from(ScanRecord)
-        )
+        scan_count = session.scalar(select(func.count()).select_from(ScanRecord))
 
-        asset_count = session.scalar(
-            select(func.count())
-            .select_from(AssetRecord)
-        )
+        asset_count = session.scalar(select(func.count()).select_from(AssetRecord))
 
         relationship_count = session.scalar(
-            select(func.count())
-            .select_from(RelationshipRecord)
+            select(func.count()).select_from(RelationshipRecord)
         )
 
     assert scan_count == 1

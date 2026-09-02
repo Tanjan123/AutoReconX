@@ -31,10 +31,7 @@ def _json_default(value: Any) -> Any:
     if hasattr(value, "isoformat"):
         return value.isoformat()
 
-    raise TypeError(
-        f"Object of type {type(value).__name__} "
-        "is not JSON serializable"
-    )
+    raise TypeError(f"Object of type {type(value).__name__} is not JSON serializable")
 
 
 def _serialize_asset(asset: object) -> str:
@@ -52,9 +49,7 @@ def _serialize_sources(
 ) -> str:
     """Serialize asset provenance deterministically."""
 
-    return json.dumps(
-        sorted(sources)
-    )
+    return json.dumps(sorted(sources))
 
 
 def _save_asset_group(
@@ -79,9 +74,7 @@ def _save_asset_group(
                 asset_type=asset_type,
                 asset_key=asset_key,
                 data_json=_serialize_asset(asset),
-                sources_json=_serialize_sources(
-                    sources
-                ),
+                sources_json=_serialize_sources(sources),
             )
         )
 
@@ -96,15 +89,11 @@ def save_correlated_scan(
     Returns the final database path.
     """
 
-    engine = create_database_engine(
-        database_path
-    )
+    engine = create_database_engine(database_path)
 
     initialize_database(engine)
 
-    session_factory = create_session_factory(
-        engine
-    )
+    session_factory = create_session_factory(engine)
 
     with session_factory() as session:
         session.add(

@@ -21,12 +21,6 @@ def test_build_ip_web_urls():
         requested_path="/DVWA/index.php",
     )
 
-    assert (
-        "http://127.0.0.1/DVWA/index.php"
-        in urls
-    )
+    assert "http://127.0.0.1/DVWA/index.php" in urls
 
-    assert all(
-        ":3306" not in url
-        for url in urls
-    )
+    assert all(":3306" not in url for url in urls)

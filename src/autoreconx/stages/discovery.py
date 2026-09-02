@@ -67,10 +67,8 @@ def run_subfinder(context: ScanContext) -> tuple[str, ...]:
         typer.echo(f" - {subdomain}")
 
     typer.echo(f"[saved] raw output: {raw_dir / 'subfinder.txt'}")
-   
-    context.result.domains.extend(
-        normalize_subdomains(parsed.subdomains)
-    )
+
+    context.result.domains.extend(normalize_subdomains(parsed.subdomains))
 
     return parsed.subdomains
 
@@ -101,9 +99,7 @@ def run_dns_resolution(
         subdomains,
     )
 
-    dnsx_args = build_dnsx_args(
-        str(subdomains_file)
-    )
+    dnsx_args = build_dnsx_args(str(subdomains_file))
 
     try:
         result = runner.run(
@@ -114,9 +110,7 @@ def run_dns_resolution(
         )
     except FileNotFoundError as exc:
         typer.echo(f"[warn] {exc}")
-        typer.echo(
-            "[hint] install dnsx and ensure it is in PATH"
-        )
+        typer.echo("[hint] install dnsx and ensure it is in PATH")
         return None
 
     if result.timed_out:
@@ -124,9 +118,7 @@ def run_dns_resolution(
         return None
 
     if result.returncode != 0:
-        typer.echo(
-            f"[warn] dnsx failed (rc={result.returncode})"
-        )
+        typer.echo(f"[warn] dnsx failed (rc={result.returncode})")
 
         if result.stderr.strip():
             typer.echo(result.stderr.strip()[:500])
@@ -138,30 +130,19 @@ def run_dns_resolution(
         root_domain=context.scope.target,
     )
 
-    typer.echo(
-        f"[ok] resolved hosts: {len(resolved.resolved)}"
-    )
+    typer.echo(f"[ok] resolved hosts: {len(resolved.resolved)}")
 
     for item in resolved.resolved[:10]:
-        typer.echo(
-            f" - {item.host} -> {', '.join(item.ips)}"
-        )
+        typer.echo(f" - {item.host} -> {', '.join(item.ips)}")
 
-    typer.echo(
-        f"[saved] dnsx raw output: "
-        f"{raw_dir / 'dnsx.jsonl'}"
-    )
+    typer.echo(f"[saved] dnsx raw output: {raw_dir / 'dnsx.jsonl'}")
 
-    normalized_domains, normalized_ips = normalize_resolutions(
-        resolved.resolved
-    )
+    normalized_domains, normalized_ips = normalize_resolutions(resolved.resolved)
 
     context.result.domains.extend(normalized_domains)
     context.result.ips.extend(normalized_ips)
     context.result.dns_resolutions.extend(
-        normalize_dns_relationships(
-            resolved.resolved
-        )
+        normalize_dns_relationships(resolved.resolved)
     )
 
     return resolved

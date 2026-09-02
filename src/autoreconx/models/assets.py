@@ -89,6 +89,7 @@ class EndpointAsset:
     source: str = "unknown"
     discovered_at: datetime = field(default_factory=utc_now)
 
+
 @dataclass(frozen=True)
 class DNSResolution:
     """

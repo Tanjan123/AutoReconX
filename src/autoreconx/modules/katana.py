@@ -93,10 +93,7 @@ def parse_katana_output(output: str) -> KatanaResult:
 
         # Tolerate top-level output fields as well.
         if not url:
-            candidate = (
-                obj.get("url")
-                or obj.get("endpoint")
-            )
+            candidate = obj.get("url") or obj.get("endpoint")
 
             if isinstance(candidate, str):
                 url = candidate.strip()
@@ -121,9 +118,4 @@ def parse_katana_output(output: str) -> KatanaResult:
             path=parsed.path or "/",
         )
 
-    return KatanaResult(
-        endpoints=tuple(
-            endpoints[url]
-            for url in sorted(endpoints)
-        )
-    )
+    return KatanaResult(endpoints=tuple(endpoints[url] for url in sorted(endpoints)))

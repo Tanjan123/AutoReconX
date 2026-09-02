@@ -75,9 +75,7 @@ def run_ip_pipeline(
         typer.echo(
             "[warn] target IP is public/global and scanning is disabled by default."
         )
-        typer.echo(
-            "[hint] use --allow-public only if you are explicitly authorized."
-        )
+        typer.echo("[hint] use --allow-public only if you are explicitly authorized.")
         return
 
     if not ports:
@@ -117,14 +115,7 @@ def run_ip_pipeline(
         )
 
         if crawl and http_result is not None:
-            confirmed_urls = tuple(
-                sorted(
-                    {
-                        item.url
-                        for item in http_result.items
-                    }
-                )
-            )
+            confirmed_urls = tuple(sorted({item.url for item in http_result.items}))
 
             run_crawl(
                 context,
@@ -141,13 +132,14 @@ def run_ip_pipeline(
         )
     else:
         typer.echo(
-            "[info] service enumeration disabled "
-            "(use --services to enable nmap stage)."
+            "[info] service enumeration disabled (use --services to enable nmap stage)."
         )
+
 
 def run_domain_pipeline(
     context: ScanContext,
     *,
+    dns: bool,
     ports: bool,
     services: bool,
     web: bool,
@@ -173,12 +165,15 @@ def run_domain_pipeline(
         Nmap service enumeration (optional)
     """
 
-
     # Subfinder (passive subdomain discovery)
     subdomains = run_subfinder(context)
 
     if not subdomains:
         typer.echo("[info] no subdomains discovered; stopping.")
+        return
+
+    if not dns:
+        typer.echo("[info] DNS resolution disabled by scan profile.")
         return
 
     # DNS resolution
@@ -188,9 +183,7 @@ def run_domain_pipeline(
     )
 
     if resolved is None:
-        typer.echo(
-            "[info] DNS resolution did not complete; stopping."
-        )
+        typer.echo("[info] DNS resolution did not complete; stopping.")
         return
 
     # HTTPX hostname probing
@@ -198,9 +191,7 @@ def run_domain_pipeline(
     host_http_result = None
 
     if web or crawl:
-        host_seed_urls = build_hostname_seed_urls(
-            resolved.resolved
-        )
+        host_seed_urls = build_hostname_seed_urls(resolved.resolved)
 
         host_http_result = run_http_probe(
             context,
@@ -211,12 +202,7 @@ def run_domain_pipeline(
 
         if crawl and host_http_result is not None:
             confirmed_urls = tuple(
-                sorted(
-                    {
-                        item.url
-                        for item in host_http_result.items
-                    }
-                )
+                sorted({item.url for item in host_http_result.items})
             )
 
             run_crawl(
@@ -229,8 +215,7 @@ def run_domain_pipeline(
     # Port discovery is optional
     if not ports:
         typer.echo(
-            "[info] port discovery disabled "
-            "(use --ports to enable naabu stage)."
+            "[info] port discovery disabled (use --ports to enable naabu stage)."
         )
         return
 
@@ -245,14 +230,8 @@ def run_domain_pipeline(
     )
 
     if not scan_ips:
-        typer.echo(
-            "[warn] no IPs eligible for scanning "
-            "(private-only by default)."
-        )
-        typer.echo(
-            "[hint] use --allow-public only if "
-            "you are explicitly authorized."
-        )
+        typer.echo("[warn] no IPs eligible for scanning (private-only by default).")
+        typer.echo("[hint] use --allow-public only if you are explicitly authorized.")
         return
 
     # Naabu
@@ -276,12 +255,7 @@ def run_domain_pipeline(
             )
         )
 
-        extra_urls = tuple(
-            sorted(
-                discovered_urls
-                - set(host_seed_urls)
-            )
-        )
+        extra_urls = tuple(sorted(discovered_urls - set(host_seed_urls)))
 
         if extra_urls:
             run_http_probe(
@@ -291,10 +265,7 @@ def run_domain_pipeline(
                 label="HTTP probing - discovered ports",
             )
         else:
-            typer.echo(
-                "[info] no additional "
-                "web port URLs discovered."
-            )
+            typer.echo("[info] no additional web port URLs discovered.")
 
     # Nmap is optional
     if services:
@@ -304,6 +275,5 @@ def run_domain_pipeline(
         )
     else:
         typer.echo(
-            "[info] service enumeration disabled "
-            "(use --services to enable nmap stage)."
+            "[info] service enumeration disabled (use --services to enable nmap stage)."
         )

@@ -37,9 +37,7 @@ def build_report_data(
             "services": len(result.services),
             "web_apps": len(result.web_assets),
             "endpoints": len(result.endpoints),
-            "relationships": len(
-                result.relationships
-            ),
+            "relationships": len(result.relationships),
         },
         "domains": [
             {
@@ -82,9 +80,7 @@ def build_report_data(
                 "status_code": asset.status_code,
                 "title": asset.title,
                 "webserver": asset.webserver,
-                "technologies": sorted(
-                    asset.technologies
-                ),
+                "technologies": sorted(asset.technologies),
                 "sources": _asset_sources(asset),
             }
             for asset in result.web_assets.values()
@@ -148,14 +144,7 @@ def _html_list(items: list[str]) -> str:
     if not items:
         return "<p>None</p>"
 
-    return (
-        "<ul>"
-        + "".join(
-            f"<li>{html.escape(item)}</li>"
-            for item in items
-        )
-        + "</ul>"
-    )
+    return "<ul>" + "".join(f"<li>{html.escape(item)}</li>" for item in items) + "</ul>"
 
 
 def write_html_report(
@@ -174,9 +163,7 @@ def write_html_report(
     priority_html = ""
 
     for item in data["priorities"][:20]:
-        reasons = _html_list(
-            item["reasons"]
-        )
+        reasons = _html_list(item["reasons"])
 
         priority_html += f"""
         <div class="card">
@@ -192,9 +179,7 @@ def write_html_report(
     web_html = ""
 
     for item in data["web_apps"]:
-        technologies = ", ".join(
-            item["technologies"]
-        )
+        technologies = ", ".join(item["technologies"])
 
         web_html += f"""
         <tr>

@@ -55,10 +55,7 @@ def correlate_scan(
 
     # Ports
     for asset in result.ports:
-        key = (
-            f"{asset.ip}:{asset.port}/"
-            f"{asset.protocol}"
-        )
+        key = f"{asset.ip}:{asset.port}/{asset.protocol}"
 
         logical = correlated.ports.setdefault(
             key,
@@ -73,10 +70,7 @@ def correlate_scan(
 
     # Services
     for asset in result.services:
-        key = (
-            f"{asset.ip}:{asset.port}/"
-            f"{asset.protocol}"
-        )
+        key = f"{asset.ip}:{asset.port}/{asset.protocol}"
 
         logical = correlated.services.setdefault(
             key,
@@ -107,9 +101,7 @@ def correlate_scan(
         )
 
         logical.sources.add(asset.source)
-        logical.technologies.update(
-            asset.technologies
-        )
+        logical.technologies.update(asset.technologies)
 
     # Endpoints
     for asset in result.endpoints:
@@ -136,8 +128,6 @@ def build_relationships(
     result: ScanResult,
     correlated: CorrelatedScanResult,
 ) -> None:
-
-
     """
     Build relationships that can be safely derived from normalized data.
 
@@ -192,13 +182,9 @@ def build_relationships(
             resolution.source,
         )
 
-
     # IP -> Port
     for port in correlated.ports.values():
-        port_id = (
-            f"{port.ip}:{port.port}/"
-            f"{port.protocol}"
-        )
+        port_id = f"{port.ip}:{port.port}/{port.protocol}"
 
         add_relationship(
             "ip",
@@ -211,10 +197,7 @@ def build_relationships(
 
     # Port -> Service
     for service in correlated.services.values():
-        port_id = (
-            f"{service.ip}:{service.port}/"
-            f"{service.protocol}"
-        )
+        port_id = f"{service.ip}:{service.port}/{service.protocol}"
 
         service_id = port_id
 
@@ -238,11 +221,7 @@ def build_relationships(
 
         # A web application may be associated with either
         # a domain or a direct IP target.
-        source_type = (
-            "domain"
-            if host in correlated.domains
-            else "ip"
-        )
+        source_type = "domain" if host in correlated.domains else "ip"
 
         add_relationship(
             source_type,
@@ -254,9 +233,7 @@ def build_relationships(
         )
 
     # Web Application -> Endpoint
-    web_urls = tuple(
-        correlated.web_assets.keys()
-    )
+    web_urls = tuple(correlated.web_assets.keys())
 
     for endpoint in correlated.endpoints.values():
         endpoint_parsed = urlparse(endpoint.url)
@@ -267,10 +244,8 @@ def build_relationships(
             web_parsed = urlparse(web_url)
 
             if (
-                endpoint_parsed.hostname
-                == web_parsed.hostname
-                and endpoint_parsed.scheme
-                == web_parsed.scheme
+                endpoint_parsed.hostname == web_parsed.hostname
+                and endpoint_parsed.scheme == web_parsed.scheme
             ):
                 best_parent = web_url
                 break
@@ -287,6 +262,4 @@ def build_relationships(
             "katana",
         )
 
-    correlated.relationships = list(
-        relationships.values()
-    )
+    correlated.relationships = list(relationships.values())

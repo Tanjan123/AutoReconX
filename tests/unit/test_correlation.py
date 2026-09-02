@@ -37,9 +37,7 @@ def test_correlation_deduplicates_domains_and_preserves_sources():
 
     assert len(correlated.domains) == 1
 
-    domain = correlated.domains[
-        "api.example.com"
-    ]
+    domain = correlated.domains["api.example.com"]
 
     assert domain.sources == {
         "subfinder",
@@ -96,14 +94,13 @@ def test_correlation_merges_web_technologies():
 
     correlated = correlate_scan(result)
 
-    web = correlated.web_assets[
-        "https://example.com"
-    ]
+    web = correlated.web_assets["https://example.com"]
 
     assert web.technologies == {
         "nginx",
         "PHP",
     }
+
 
 def test_correlation_builds_ip_to_port_relationship():
     result = ScanResult(
@@ -129,12 +126,9 @@ def test_correlation_builds_ip_to_port_relationship():
     correlated = correlate_scan(result)
 
     assert any(
-        relationship.relationship
-        == RelationshipType.EXPOSES
-        and relationship.source_id
-        == "10.0.0.1"
-        and relationship.target_id
-        == "10.0.0.1:80/tcp"
+        relationship.relationship == RelationshipType.EXPOSES
+        and relationship.source_id == "10.0.0.1"
+        and relationship.target_id == "10.0.0.1:80/tcp"
         for relationship in correlated.relationships
     )
 
@@ -166,8 +160,7 @@ def test_correlation_builds_port_to_service_relationship():
     correlated = correlate_scan(result)
 
     assert any(
-        relationship.relationship
-        == RelationshipType.RUNS
+        relationship.relationship == RelationshipType.RUNS
         for relationship in correlated.relationships
     )
 
@@ -198,10 +191,10 @@ def test_correlation_builds_web_to_endpoint_relationship():
     correlated = correlate_scan(result)
 
     assert any(
-        relationship.relationship
-        == RelationshipType.CONTAINS
+        relationship.relationship == RelationshipType.CONTAINS
         for relationship in correlated.relationships
     )
+
 
 def test_correlation_builds_domain_to_ip_relationship():
     result = ScanResult(
@@ -220,13 +213,9 @@ def test_correlation_builds_domain_to_ip_relationship():
     correlated = correlate_scan(result)
 
     assert any(
-        relationship.relationship
-        == RelationshipType.RESOLVES_TO
-        and relationship.source_id
-        == "api.example.com"
-        and relationship.target_id
-        == "10.0.0.1"
-        and relationship.evidence_source
-        == "dnsx"
+        relationship.relationship == RelationshipType.RESOLVES_TO
+        and relationship.source_id == "api.example.com"
+        and relationship.target_id == "10.0.0.1"
+        and relationship.evidence_source == "dnsx"
         for relationship in correlated.relationships
     )

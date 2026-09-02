@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "autoreconx"
-version = "0.1.0"
+version = "1.0.0"
 description = "AutoReconX — automated reconnaissance & attack-surface mapping framework (authorized use only)."
 readme = "README.md"
 requires-python = ">=3.12"
@@ -29,3 +29,6 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.ruff.lint.per-file-ignores]
+"src/autoreconx/cli.py" = ["B008"]

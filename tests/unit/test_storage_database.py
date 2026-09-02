@@ -13,17 +13,13 @@ def test_initialize_database_creates_tables(
 ):
     db_path = tmp_path / "autoreconx.db"
 
-    engine = create_database_engine(
-        db_path
-    )
+    engine = create_database_engine(db_path)
 
     initialize_database(engine)
 
     inspector = inspect(engine)
 
-    tables = set(
-        inspector.get_table_names()
-    )
+    tables = set(inspector.get_table_names())
 
     assert "scans" in tables
     assert "assets" in tables

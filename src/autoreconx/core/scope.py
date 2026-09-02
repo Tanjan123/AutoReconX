@@ -41,7 +41,7 @@ def _extract_host(value: str) -> str:
             host = host.split(":", 1)[0]
         # handle [ipv6]:port
         if host.startswith("[") and "]" in host:
-            host = host[1:host.index("]")]
+            host = host[1 : host.index("]")]
         return host.strip().rstrip(".").lower()
 
     return v.rstrip(".").lower()
@@ -147,7 +147,9 @@ def parse_scope(
             try:
                 # if it's an IP, convert to /32 or /128
                 ip_obj = ipaddress.ip_address(x)
-                net = ipaddress.ip_network(f"{ip_obj}/{ip_obj.max_prefixlen}", strict=False)
+                net = ipaddress.ip_network(
+                    f"{ip_obj}/{ip_obj.max_prefixlen}", strict=False
+                )
                 ex_networks.append(net)
                 continue
             except ValueError:

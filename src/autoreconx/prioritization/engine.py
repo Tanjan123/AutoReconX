@@ -59,16 +59,12 @@ def prioritize_scan(
         score = 0
         reasons: list[str] = []
 
-        labels = set(
-            domain.hostname.lower().split(".")
-        )
+        labels = set(domain.hostname.lower().split("."))
 
         for word, points in interesting_hostname_words.items():
             if word in labels:
                 score += points
-                reasons.append(
-                    f"Interesting hostname indicator: {word}"
-                )
+                reasons.append(f"Interesting hostname indicator: {word}")
 
         if score:
             items.append(
@@ -94,9 +90,7 @@ def prioritize_scan(
     }
 
     for service in result.services.values():
-        name = (
-            service.service or ""
-        ).lower()
+        name = (service.service or "").lower()
 
         score = interesting_services.get(
             name,
@@ -107,16 +101,10 @@ def prioritize_scan(
             items.append(
                 PriorityItem(
                     asset_type="service",
-                    asset_id=(
-                        f"{service.ip}:"
-                        f"{service.port}/"
-                        f"{service.protocol}"
-                    ),
+                    asset_id=(f"{service.ip}:{service.port}/{service.protocol}"),
                     score=score,
                     level=_priority_level(score),
-                    reasons=(
-                        f"Interesting exposed service: {name}",
-                    ),
+                    reasons=(f"Interesting exposed service: {name}",),
                 )
             )
 
@@ -129,35 +117,21 @@ def prioritize_scan(
 
         parsed = urlparse(web.url)
 
-        hostname = (
-            parsed.hostname or ""
-        ).lower()
+        hostname = (parsed.hostname or "").lower()
 
         if hostname.startswith("admin."):
             score += 30
-            reasons.append(
-                "Administrative web hostname"
-            )
+            reasons.append("Administrative web hostname")
 
         if hostname.startswith("api."):
             score += 20
-            reasons.append(
-                "API web hostname"
-            )
+            reasons.append("API web hostname")
 
-        tech_lower = {
-            tech.lower()
-            for tech in web.technologies
-        }
+        tech_lower = {tech.lower() for tech in web.technologies}
 
-        if any(
-            "swagger" in tech
-            for tech in tech_lower
-        ):
+        if any("swagger" in tech for tech in tech_lower):
             score += 15
-            reasons.append(
-                "API documentation technology detected"
-            )
+            reasons.append("API documentation technology detected")
 
         items.append(
             PriorityItem(
@@ -181,9 +155,7 @@ def prioritize_scan(
     }
 
     for endpoint in result.endpoints.values():
-        path = (
-            endpoint.path or ""
-        ).lower()
+        path = (endpoint.path or "").lower()
 
         score = 0
         reasons = []
@@ -191,9 +163,7 @@ def prioritize_scan(
         for indicator, points in interesting_paths.items():
             if indicator in path:
                 score += points
-                reasons.append(
-                    f"Interesting path indicator: {indicator}"
-                )
+                reasons.append(f"Interesting path indicator: {indicator}")
 
         if score:
             items.append(

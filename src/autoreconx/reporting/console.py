@@ -14,42 +14,24 @@ def print_scan_summary(
     """Print a compact correlated attack-surface summary."""
 
     typer.echo("")
-    typer.echo(
-        "[summary] correlated attack surface"
-    )
+    typer.echo("[summary] correlated attack surface")
 
-    typer.echo(
-        f" target:       {result.target}"
-    )
+    typer.echo(f" target:       {result.target}")
 
-    typer.echo(
-        f" domains:      {len(result.domains)}"
-    )
+    typer.echo(f" domains:      {len(result.domains)}")
 
-    typer.echo(
-        f" IP addresses: {len(result.ips)}"
-    )
+    typer.echo(f" IP addresses: {len(result.ips)}")
 
-    typer.echo(
-        f" ports:        {len(result.ports)}"
-    )
+    typer.echo(f" ports:        {len(result.ports)}")
 
-    typer.echo(
-        f" services:     {len(result.services)}"
-    )
+    typer.echo(f" services:     {len(result.services)}")
 
-    typer.echo(
-        f" web apps:     {len(result.web_assets)}"
-    )
+    typer.echo(f" web apps:     {len(result.web_assets)}")
 
-    typer.echo(
-        f" endpoints:    {len(result.endpoints)}"
-    )
+    typer.echo(f" endpoints:    {len(result.endpoints)}")
 
-    typer.echo(
-        f" relationships: "
-        f"{len(result.relationships)}"
-    )
+    typer.echo(f" relationships: {len(result.relationships)}")
+
 
 def print_priority_summary(
     items: tuple[PriorityItem, ...],
@@ -78,6 +60,4 @@ def print_priority_summary(
         )
 
         for reason in item.reasons:
-            typer.echo(
-                f"          - {reason}"
-            )
+            typer.echo(f"          - {reason}")

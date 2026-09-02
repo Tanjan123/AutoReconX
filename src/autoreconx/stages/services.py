@@ -22,9 +22,7 @@ def run_service_enumeration(
     runner = context.runner
 
     if not open_ports:
-        typer.echo(
-            "[info] no open ports available for nmap service enumeration."
-        )
+        typer.echo("[info] no open ports available for nmap service enumeration.")
         return ()
 
     ports_by_ip: dict[str, list[int]] = {}
@@ -32,18 +30,14 @@ def run_service_enumeration(
     for item in open_ports:
         ports_by_ip.setdefault(item.ip, []).append(item.port)
 
-    typer.echo(
-        f"[run] nmap (service enumeration) hosts={len(ports_by_ip)}"
-    )
+    typer.echo(f"[run] nmap (service enumeration) hosts={len(ports_by_ip)}")
 
     discovered_services: list[NmapService] = []
 
     for ip, port_list in ports_by_ip.items():
         unique_ports = sorted(set(port_list))
 
-        typer.echo(
-            f"[run] nmap {ip} ports={unique_ports}"
-        )
+        typer.echo(f"[run] nmap {ip} ports={unique_ports}")
 
         xml_path = raw_dir / f"nmap-{ip}.xml"
 
@@ -57,34 +51,23 @@ def run_service_enumeration(
             result = runner.run(
                 args,
                 timeout=900,
-                stdout_path=str(
-                    raw_dir / f"nmap-{ip}.stdout"
-                ),
-                stderr_path=str(
-                    raw_dir / f"nmap-{ip}.err"
-                ),
+                stdout_path=str(raw_dir / f"nmap-{ip}.stdout"),
+                stderr_path=str(raw_dir / f"nmap-{ip}.err"),
             )
         except FileNotFoundError as exc:
             typer.echo(f"[warn] {exc}")
             continue
 
         if result.timed_out:
-            typer.echo(
-                f"[warn] nmap timed out for {ip}"
-            )
+            typer.echo(f"[warn] nmap timed out for {ip}")
             continue
 
         if result.returncode != 0:
-            typer.echo(
-                f"[warn] nmap failed for {ip} "
-                f"(rc={result.returncode})"
-            )
+            typer.echo(f"[warn] nmap failed for {ip} (rc={result.returncode})")
             continue
 
         if not xml_path.exists():
-            typer.echo(
-                f"[warn] nmap XML output missing for {ip}"
-            )
+            typer.echo(f"[warn] nmap XML output missing for {ip}")
             continue
 
         xml_text = xml_path.read_text(
@@ -94,22 +77,15 @@ def run_service_enumeration(
 
         parsed = parse_nmap_xml(xml_text)
 
-        typer.echo(
-            f"[ok] {ip} services: {len(parsed.services)}"
-        )
+        typer.echo(f"[ok] {ip} services: {len(parsed.services)}")
 
         for service in parsed.services[:10]:
             name = service.service or "unknown"
 
-            typer.echo(
-                f" - {service.ip}:{service.port}/"
-                f"{service.protocol} {name}"
-            )
+            typer.echo(f" - {service.ip}:{service.port}/{service.protocol} {name}")
 
         discovered_services.extend(parsed.services)
 
-    context.result.services.extend(
-        normalize_services(discovered_services)
-    )
+    context.result.services.extend(normalize_services(discovered_services))
 
     return tuple(discovered_services)

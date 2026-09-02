@@ -25,9 +25,7 @@ def test_admin_domain_priority():
         )
     )
 
-    result = prioritize_scan(
-        correlate_scan(scan)
-    )
+    result = prioritize_scan(correlate_scan(scan))
 
     assert len(result) == 1
     assert result[0].score == 30
@@ -50,9 +48,7 @@ def test_database_service_priority():
         )
     )
 
-    result = prioritize_scan(
-        correlate_scan(scan)
-    )
+    result = prioritize_scan(correlate_scan(scan))
 
     assert result[0].score == 25
 
@@ -71,9 +67,7 @@ def test_interesting_endpoint_priority():
         )
     )
 
-    result = prioritize_scan(
-        correlate_scan(scan)
-    )
+    result = prioritize_scan(correlate_scan(scan))
 
     assert result[0].score == 40
     assert result[0].level == PriorityLevel.HIGH
@@ -93,9 +87,7 @@ def test_live_web_application_gets_low_priority():
         )
     )
 
-    result = prioritize_scan(
-        correlate_scan(scan)
-    )
+    result = prioritize_scan(correlate_scan(scan))
 
     assert result[0].score == 5
     assert result[0].level == PriorityLevel.LOW

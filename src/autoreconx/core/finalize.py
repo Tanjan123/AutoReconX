@@ -17,18 +17,13 @@ def finalize_scan(
     Correlate the completed scan and persist it to SQLite.
     """
 
-    correlated = correlate_scan(
-        context.result
-    )
+    correlated = correlate_scan(context.result)
 
     save_correlated_scan(
         correlated,
         context.database_path,
     )
 
-    typer.echo(
-        f"[saved] database: "
-        f"{context.database_path}"
-    )
+    typer.echo(f"[saved] database: {context.database_path}")
 
     return correlated
